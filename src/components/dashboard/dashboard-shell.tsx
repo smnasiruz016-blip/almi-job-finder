@@ -258,20 +258,22 @@ export function DashboardShell({
 
   const availableRegions = useMemo(() => getRegionOptions(formState.country), [formState.country]);
   const availableCities = useMemo(() => getCityOptions(formState.country, formState.state), [formState.country, formState.state]);
-  const citySelectDisabled = formState.country === "Worldwide" || availableCities.length === 0;
+  const useRegionSelect = formState.country !== "Worldwide" && availableRegions.length > 0;
+  const useCitySelect = formState.country !== "Worldwide" && availableCities.length > 0;
+  const citySelectDisabled = formState.country === "Worldwide" || (useRegionSelect && !formState.state);
   const cityPlaceholder = formState.country === "Worldwide"
     ? "No city needed"
-    : !formState.state && availableRegions.length > 0
+    : !formState.state && useRegionSelect
       ? "Select a region first"
-      : availableCities.length
+      : useCitySelect
         ? "Select city"
-        : "City filter not available yet";
+        : "Type a city if you want";
   const cityHelpText = formState.country === "Worldwide"
     ? "Worldwide search does not need a city filter."
-    : !formState.state && availableRegions.length > 0
+    : !formState.state && useRegionSelect
       ? "Choose a state or region first to unlock city options."
-      : availableCities.length === 0
-        ? "You can still search by country even when city filtering is not mapped yet."
+      : !useCitySelect
+        ? "You can type a city manually when we do not have mapped city options yet."
         : "Optional: narrow your results further by city.";
 
   const sortedResults = useMemo(() => {
@@ -753,33 +755,52 @@ export function DashboardShell({
                 </option>
               ))}
             </Select>
-            <Select
-              name="state"
-              value={formState.state}
-              onChange={(event) => {
-                updateForm("state", event.target.value);
-                updateForm("city", "");
-              }}
-              disabled={formState.country === "Worldwide"}
-            >
-              <option value="">{formState.country === "Worldwide" ? "No region needed" : "Select state / region"}</option>
-              {availableRegions.map((region) => (
-                <option key={region} value={region}>
-                  {region}
-                </option>
-              ))}
-            </Select>
-            <Select name="city" value={formState.city} onChange={(event) => updateForm("city", event.target.value)} disabled={citySelectDisabled}>
-              <option value="">
-                {cityPlaceholder}
-              </option>
-              {availableCities.map((city) => (
-                <option key={city} value={city}>
-                  {city}
-                </option>
-              ))}
-            </Select>
-            <p className="px-1 text-xs text-slate-500">{cityHelpText}</p>
+              {useRegionSelect ? (
+                <Select
+                  name="state"
+                  value={formState.state}
+                  onChange={(event) => {
+                    updateForm("state", event.target.value);
+                    updateForm("city", "");
+                  }}
+                >
+                  <option value="">{formState.country === "Worldwide" ? "No region needed" : "Select state / region"}</option>
+                  {availableRegions.map((region) => (
+                    <option key={region} value={region}>
+                      {region}
+                    </option>
+                  ))}
+                </Select>
+              ) : (
+                <Input
+                  name="state"
+                  placeholder={formState.country === "Worldwide" ? "No region needed" : "State / region optional"}
+                  value={formState.state}
+                  onChange={(event) => updateForm("state", event.target.value)}
+                  disabled={formState.country === "Worldwide"}
+                />
+              )}
+              {useCitySelect ? (
+                <Select name="city" value={formState.city} onChange={(event) => updateForm("city", event.target.value)} disabled={citySelectDisabled}>
+                  <option value="">
+                    {cityPlaceholder}
+                  </option>
+                  {availableCities.map((city) => (
+                    <option key={city} value={city}>
+                      {city}
+                    </option>
+                  ))}
+                </Select>
+              ) : (
+                <Input
+                  name="city"
+                  placeholder={cityPlaceholder}
+                  value={formState.city}
+                  onChange={(event) => updateForm("city", event.target.value)}
+                  disabled={formState.country === "Worldwide"}
+                />
+              )}
+              <p className="px-1 text-xs text-slate-500">{cityHelpText}</p>
             <Select name="remoteMode" value={formState.remoteMode} onChange={(event) => updateForm("remoteMode", event.target.value)}>
               <option value="">Remote preference</option>
               <option value="REMOTE">Remote</option>
