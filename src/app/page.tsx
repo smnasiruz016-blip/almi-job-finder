@@ -22,10 +22,10 @@ const steps = [
 ];
 
 const benefits = [
-  "Resume-aware ranking that explains why jobs match",
-  "Live-ready adapter system with a real provider and safe fallback data",
-  "Saved jobs, saved searches, and alert-ready workflow",
-  "Freemium-ready usage tracking and launch-minded product UX"
+  "Understand exactly why each job fits you",
+  "Discover real opportunities from trusted sources",
+  "Save and organize roles that matter",
+  "Stay consistent with smart alerts and resume insights"
 ];
 
 const capabilityList = [
@@ -79,7 +79,7 @@ export default async function HomePage() {
 
         <div className="grid gap-8 pb-16 pt-10 md:grid-cols-[1.08fr_0.92fr] md:items-center md:pt-16">
           <div className="space-y-6">
-            <span className="eyebrow">Launch-ready job search</span>
+            <span className="eyebrow">Resume-based job search</span>
             <div className="space-y-4">
               <h1 className="section-title max-w-4xl font-[family-name:var(--font-display)]">
                 Find Jobs Faster Using Your Resume
