@@ -258,6 +258,21 @@ export function DashboardShell({
 
   const availableRegions = useMemo(() => getRegionOptions(formState.country), [formState.country]);
   const availableCities = useMemo(() => getCityOptions(formState.country, formState.state), [formState.country, formState.state]);
+  const citySelectDisabled = formState.country === "Worldwide" || availableCities.length === 0;
+  const cityPlaceholder = formState.country === "Worldwide"
+    ? "No city needed"
+    : !formState.state && availableRegions.length > 0
+      ? "Select a region first"
+      : availableCities.length
+        ? "Select city"
+        : "City filter not available yet";
+  const cityHelpText = formState.country === "Worldwide"
+    ? "Worldwide search does not need a city filter."
+    : !formState.state && availableRegions.length > 0
+      ? "Choose a state or region first to unlock city options."
+      : availableCities.length === 0
+        ? "You can still search by country even when city filtering is not mapped yet."
+        : "Optional: narrow your results further by city.";
 
   const sortedResults = useMemo(() => {
     const next = [...results];
@@ -754,9 +769,9 @@ export function DashboardShell({
                 </option>
               ))}
             </Select>
-            <Select name="city" value={formState.city} onChange={(event) => updateForm("city", event.target.value)} disabled={formState.country === "Worldwide" || availableCities.length === 0}>
+            <Select name="city" value={formState.city} onChange={(event) => updateForm("city", event.target.value)} disabled={citySelectDisabled}>
               <option value="">
-                {formState.country === "Worldwide" ? "No city needed" : availableCities.length ? "Select city" : "City optional"}
+                {cityPlaceholder}
               </option>
               {availableCities.map((city) => (
                 <option key={city} value={city}>
@@ -764,6 +779,7 @@ export function DashboardShell({
                 </option>
               ))}
             </Select>
+            <p className="px-1 text-xs text-slate-500">{cityHelpText}</p>
             <Select name="remoteMode" value={formState.remoteMode} onChange={(event) => updateForm("remoteMode", event.target.value)}>
               <option value="">Remote preference</option>
               <option value="REMOTE">Remote</option>
