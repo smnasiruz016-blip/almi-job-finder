@@ -48,8 +48,7 @@ export function AuthForm({ mode }: AuthFormProps) {
       return;
     }
 
-    router.push("/dashboard");
-    router.refresh();
+    router.replace("/dashboard");
   }
 
   return (

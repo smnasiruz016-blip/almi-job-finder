@@ -65,19 +65,21 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     return null;
   }
 
-  const session = await prisma.session.findFirst({
+  const session = await prisma.session.findUnique({
     where: {
-      tokenHash: sha256(token),
-      expiresAt: {
-        gt: new Date()
-      }
+      tokenHash: sha256(token)
     },
     include: {
       user: true
     }
   });
 
-  if (!session) {
+  if (!session || session.expiresAt <= new Date()) {
+    if (session) {
+      await prisma.session.delete({
+        where: { id: session.id }
+      });
+    }
     cookieStore.delete(SESSION_COOKIE);
     return null;
   }
