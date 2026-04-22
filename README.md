@@ -1,6 +1,6 @@
 # AlmiJob Finder
 
-AlmiJob Finder is a beta-ready job search web app built for `almiworld` with Next.js, TypeScript, Tailwind, Prisma, and PostgreSQL. Users can create an account, upload a resume, search live and fallback job sources through adapters, search worldwide or by country/state/city, rank jobs by resume fit, save jobs and searches, review resume suggestions, and use a stub-backed alert workflow while real delivery infrastructure is still being finalized.
+AlmiJob Finder is a beta-ready job search web app built for `almiworld` with Next.js, TypeScript, Tailwind, Prisma, and PostgreSQL. Users can create an account, upload a resume, search live job sources through adapters, search worldwide or by country/state/city, rank jobs by resume fit, save jobs and searches, review resume suggestions, and use a stub-backed alert workflow while real delivery infrastructure is still being finalized.
 
 ## Implementation Summary
 
@@ -146,10 +146,10 @@ Current implementation:
 - `MockWorkable`
 
 The app supports worldwide searches in two ways:
-- `Worldwide` or blank country searches work through Remote OK, Remotive, plus mock fallback data.
+- `Worldwide` or blank country searches work through Remote OK and Remotive live data.
 - Country-specific searches can also use Adzuna when `ADZUNA_APP_ID` and `ADZUNA_APP_KEY` are configured for supported countries.
 
-The app first tries each live adapter independently and keeps going even if one provider fails. If no live providers return usable jobs, it falls back to mock provider data. This avoids unsupported scraping while keeping the product usable during outages or local development.
+The app first tries each live adapter independently and keeps going even if one provider fails. If no live providers return usable jobs, the app can optionally fall back to mock provider data for internal demos or local development. For real beta users, keep sample fallback disabled so only live jobs are shown.
 
 Provider environment variables:
 - `REMOTE_OK_ENABLED`: set to `false` to disable Remote OK
@@ -161,6 +161,7 @@ Provider environment variables:
 - `ADZUNA_ENABLED`: set to `false` to disable Adzuna entirely
 - `ADZUNA_API_URL`: base Adzuna API URL
 - `ADZUNA_APP_ID` and `ADZUNA_APP_KEY`: required for Adzuna live results
+- `MOCK_FALLBACK_ENABLED`: set to `false` for production or family testing so only live jobs are shown
 - `ANALYTICS_ENABLED`: set to `false` to silence product event hooks
 - `ANALYTICS_PROVIDER`: currently `log`, with a clean abstraction point for a future analytics vendor
 

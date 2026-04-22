@@ -346,6 +346,7 @@ export function getJobAdapters() {
 
 export async function fetchFromAdapters(input: JobSearchInput) {
   const adapters = getJobAdapters();
+  const config = getProviderRuntimeConfig();
   const liveAdapters = adapters.filter((adapter) => adapter.sourceType === "live");
   const mockOnlyAdapters = adapters.filter((adapter) => adapter.sourceType !== "live");
 
@@ -386,7 +387,7 @@ export async function fetchFromAdapters(input: JobSearchInput) {
     }
   }
 
-  const shouldUseFallback = liveResults.length === 0;
+  const shouldUseFallback = liveResults.length === 0 && config.mockFallbackEnabled;
   const fallbackJobs = shouldUseFallback ? (await Promise.all(mockOnlyAdapters.map((adapter) => adapter.searchJobs(input)))).flat() : [];
 
   if (shouldUseFallback) {
@@ -410,7 +411,12 @@ export async function fetchFromAdapters(input: JobSearchInput) {
         sourceType: "mock",
         status: "disabled",
         results: 0,
-        message: "Fallback coverage stayed on standby because live providers returned results."
+        message:
+          liveResults.length > 0
+            ? "Sample fallback stayed on standby because live providers returned results."
+            : config.mockFallbackEnabled
+              ? "Sample fallback stayed on standby because it was not needed."
+              : "Sample fallback is turned off for this environment so only live jobs are shown."
       });
     }
   }

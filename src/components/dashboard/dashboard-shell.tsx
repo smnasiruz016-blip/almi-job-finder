@@ -358,7 +358,7 @@ export function DashboardShell({
 
   async function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSearchStatus({ type: "loading", message: "Searching live and fallback job sources..." });
+    setSearchStatus({ type: "loading", message: "Searching live job providers..." });
     setSaveSearchStatus({ type: "idle" });
     const formData = new FormData(event.currentTarget);
     const payload = Object.fromEntries(formData.entries());
@@ -405,22 +405,29 @@ export function DashboardShell({
     ].slice(0, 6));
 
     if (data.results.length === 0) {
-      const liveUnavailable = (data.meta?.providerStatuses ?? []).some((provider: ProviderStatus) => provider.sourceType === "live" && provider.status === "error");
+      const liveUnavailable = (data.meta?.providerStatuses ?? []).some(
+        (provider: ProviderStatus) => provider.sourceType === "live" && provider.status === "error"
+      );
+      const liveNoMatches = (data.meta?.providerStatuses ?? []).some(
+        (provider: ProviderStatus) => provider.sourceType === "live" && provider.status === "no_matches"
+      );
       setSearchStatus({
         type: "empty",
         message: liveUnavailable
-          ? "The live job source is unavailable right now, and fallback providers could not find a close match. Try again shortly or broaden your search."
-          : "No jobs found - try a broader search, add a keyword, or remove a strict location filter."
+          ? "Live job providers are temporarily unavailable right now. Try again shortly or broaden your search."
+          : liveNoMatches
+            ? "No live jobs matched this search yet. Try a broader title, country, or remote search."
+            : "No jobs found - try a broader search, add a keyword, or remove a strict location filter."
       });
       return;
     }
 
-    const fallbackNote = data.meta?.usedFallback ? " Live source unavailable, so mock fallback data was used." : "";
+    const fallbackNote = data.meta?.usedFallback ? " Sample fallback data was used for this internal search." : "";
     const highFitNote = data.meta?.quality?.highFitCount ? ` ${data.meta.quality.highFitCount} high-fit roles surfaced.` : "";
     const liveNoMatchNote =
       !data.meta?.usedFallback &&
       (data.meta?.providerStatuses ?? []).some((provider: ProviderStatus) => provider.sourceType === "live" && provider.status === "no_matches")
-        ? " Live providers are available, but this search is still narrow."
+        ? " Live providers are active, but this search is still narrow."
         : "";
     setSearchStatus({
       type: "success",
@@ -1057,15 +1064,21 @@ export function DashboardShell({
                         <p className="mt-1 text-sm text-slate-500">
                           {providerHealth.liveCount > 0
                             ? `${providerHealth.liveCount} live provider${providerHealth.liveCount > 1 ? "s are" : " is"} active for this search.`
-                            : "No live provider returned usable results for this search, so fallback coverage may be used."}
+                            : searchMeta?.usedFallback
+                              ? "Sample fallback was used because live providers did not return usable jobs."
+                              : "No live provider returned usable results for this search yet."}
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
                           Active providers: {providerHealth.activeCount}
                         </span>
-                        <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-900">
-                          Fallback used: {providerHealth.fallbackCount}
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-medium ${
+                            providerHealth.fallbackCount > 0 ? "bg-amber-50 text-amber-900" : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          {providerHealth.fallbackCount > 0 ? `Sample fallback used: ${providerHealth.fallbackCount}` : "Sample fallback off"}
                         </span>
                       </div>
                     </div>

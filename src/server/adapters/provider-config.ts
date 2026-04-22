@@ -9,6 +9,7 @@ export type ProviderRuntimeConfig = {
   adzunaApiUrl: string;
   adzunaAppId?: string;
   adzunaAppKey?: string;
+  mockFallbackEnabled: boolean;
 };
 
 function parseBoolean(value: string | undefined, defaultValue: boolean) {
@@ -35,6 +36,7 @@ export function getProviderRuntimeConfig(): ProviderRuntimeConfig {
     adzunaEnabled: parseBoolean(process.env.ADZUNA_ENABLED, true),
     adzunaApiUrl: process.env.ADZUNA_API_URL ?? "https://api.adzuna.com/v1/api/jobs",
     adzunaAppId: process.env.ADZUNA_APP_ID || undefined,
-    adzunaAppKey: process.env.ADZUNA_APP_KEY || undefined
+    adzunaAppKey: process.env.ADZUNA_APP_KEY || undefined,
+    mockFallbackEnabled: parseBoolean(process.env.MOCK_FALLBACK_ENABLED, process.env.NODE_ENV !== "production")
   };
 }

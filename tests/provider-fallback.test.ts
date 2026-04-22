@@ -6,7 +6,8 @@ const originalEnv = {
   REMOTIVE_ENABLED: process.env.REMOTIVE_ENABLED,
   ADZUNA_ENABLED: process.env.ADZUNA_ENABLED,
   ADZUNA_APP_ID: process.env.ADZUNA_APP_ID,
-  ADZUNA_APP_KEY: process.env.ADZUNA_APP_KEY
+  ADZUNA_APP_KEY: process.env.ADZUNA_APP_KEY,
+  MOCK_FALLBACK_ENABLED: process.env.MOCK_FALLBACK_ENABLED
 };
 
 describe("provider fallback", () => {
@@ -16,6 +17,7 @@ describe("provider fallback", () => {
     process.env.ADZUNA_ENABLED = originalEnv.ADZUNA_ENABLED;
     process.env.ADZUNA_APP_ID = originalEnv.ADZUNA_APP_ID;
     process.env.ADZUNA_APP_KEY = originalEnv.ADZUNA_APP_KEY;
+    process.env.MOCK_FALLBACK_ENABLED = originalEnv.MOCK_FALLBACK_ENABLED;
     vi.restoreAllMocks();
   });
 
@@ -66,6 +68,54 @@ describe("provider fallback", () => {
         expect.objectContaining({
           sourceType: "mock",
           status: "fallback"
+        })
+      ])
+    );
+  });
+
+  it("returns no mock jobs when fallback is disabled", async () => {
+    process.env.REMOTE_OK_ENABLED = "true";
+    process.env.REMOTIVE_ENABLED = "true";
+    process.env.ADZUNA_ENABLED = "false";
+    process.env.MOCK_FALLBACK_ENABLED = "false";
+
+    const fetchMock = vi
+      .spyOn(global, "fetch")
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ jobs: [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        })
+      );
+
+    const { fetchFromAdapters } = await import("@/server/adapters/provider-registry");
+    const input: JobSearchInput = {
+      desiredTitle: "Frontend Engineer",
+      country: "Worldwide"
+    };
+
+    const result = await fetchFromAdapters(input);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.usedFallback).toBe(false);
+    expect(result.jobs).toEqual([]);
+    expect(result.providerStatuses).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: "RemoteOK",
+          sourceType: "live",
+          status: "no_matches"
+        }),
+        expect.objectContaining({
+          sourceType: "mock",
+          status: "disabled",
+          message: expect.stringContaining("turned off")
         })
       ])
     );
