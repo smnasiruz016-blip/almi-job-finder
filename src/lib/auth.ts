@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
@@ -10,6 +11,17 @@ import type { SessionUser } from "@/types";
 function sha256(value: string) {
   return crypto.createHash("sha256").update(value).digest("hex");
 }
+
+const getSessionByTokenHash = cache(async (tokenHash: string) => {
+  return prisma.session.findUnique({
+    where: {
+      tokenHash
+    },
+    include: {
+      user: true
+    }
+  });
+});
 
 export async function hashPassword(password: string) {
   return bcrypt.hash(password, 12);
@@ -65,14 +77,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     return null;
   }
 
-  const session = await prisma.session.findUnique({
-    where: {
-      tokenHash: sha256(token)
-    },
-    include: {
-      user: true
-    }
-  });
+  const session = await getSessionByTokenHash(sha256(token));
 
   if (!session || session.expiresAt <= new Date()) {
     if (session) {
