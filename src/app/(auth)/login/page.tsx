@@ -20,12 +20,12 @@ export default async function LoginPage() {
             Welcome back
           </h1>
           <p className="mt-3 text-sm leading-7 text-slate-600">
-            Pick up where you left off with your CV drafts, cover letters, and template choices.
+            Pick up where you left off with saved searches, resume insights, and ranked job matches.
           </p>
           <ul className="mt-5 space-y-2 text-sm leading-7 text-slate-600">
-            <li>- Continue building your documents</li>
-            <li>- Edit saved drafts with live preview</li>
-            <li>- Keep your career documents in one place</li>
+            <li>- Search worldwide or by country, state, and city</li>
+            <li>- Track saved jobs and daily usage</li>
+            <li>- Use resume feedback before applying</li>
           </ul>
         </section>
         <div>

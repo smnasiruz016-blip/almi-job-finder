@@ -1,4 +1,3 @@
-import { filterJobsBySearchLocation } from "@/lib/location";
 import { prisma } from "@/lib/prisma";
 import { fetchFromAdapters } from "@/server/adapters/provider-registry";
 import { rankJobs } from "@/server/services/ranking";
@@ -144,8 +143,7 @@ export async function executeJobSearch(input: JobSearchInput, resume?: ParsedRes
   };
 
   const { jobs, usedFallback, sources, providerStatuses } = await fetchFromAdapters(normalizedInput);
-  const locationFilteredJobs = filterJobsBySearchLocation(jobs, normalizedInput);
-  const results = dedupeJobs(locationFilteredJobs);
+  const results = dedupeJobs(jobs);
   const ranked = rankJobs(results, normalizedInput, resume);
   const insights = buildSearchInsights(ranked);
   const quality = {

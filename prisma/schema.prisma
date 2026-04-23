@@ -18,44 +18,6 @@ enum SubscriptionTier {
   PRO
 }
 
-enum DocumentStatus {
-  DRAFT
-  READY
-  ARCHIVED
-}
-
-enum TemplateTier {
-  FREE
-  PREMIUM
-}
-
-enum ResumeTemplateFamily {
-  MINIMAL_ATS
-  MODERN_PROFESSIONAL
-  BOLD_STARTUP
-  CREATIVE_PORTFOLIO
-  COMPACT_ONE_PAGE
-  ACADEMIC_CLEAN
-}
-
-enum CoverLetterTemplateFamily {
-  CLASSIC_PROFESSIONAL
-  MODERN_CLEAN
-  MINIMAL_ATS
-  BOLD_CONTEMPORARY
-}
-
-enum ExportKind {
-  RESUME_PDF
-  COVER_LETTER_PDF
-}
-
-enum ExportStatus {
-  QUEUED
-  COMPLETED
-  FAILED
-}
-
 enum RemoteMode {
   REMOTE
   HYBRID
@@ -85,15 +47,12 @@ model User {
   subscriptionTier SubscriptionTier @default(FREE)
   sessions      Session[]
   resumes       Resume[]
-  coverLetters  CoverLetter[]
-  resumeVersions ResumeVersion[]
-  exportLogs    ExportLog[]
   searches      JobSearch[]
   searchHistory SearchHistory[]
   savedJobs     SavedJob[]
   savedSearches SavedSearch[]
   createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @default(now()) @updatedAt
+  updatedAt     DateTime        @updatedAt
 }
 
 model Session {
@@ -108,85 +67,19 @@ model Session {
 model Resume {
   id                String   @id @default(cuid())
   userId            String
-  title             String   @default("Untitled CV")
-  slug              String?
-  templateKey       String   @default("minimal-ats")
-  templateFamily    ResumeTemplateFamily @default(MINIMAL_ATS)
-  templateTier      TemplateTier @default(FREE)
-  status            DocumentStatus @default(DRAFT)
-  photoEnabled      Boolean  @default(true)
-  accentColor       String?
-  draftData         Json?
-  sectionOrder      String[] @default([])
-  hiddenSections    String[] @default([])
-  originalFilename  String?
-  storagePath       String?
-  mimeType          String?
-  extractedText     String?  @db.Text
+  originalFilename  String
+  storagePath       String
+  mimeType          String
+  extractedText     String   @db.Text
   parsedName        String?
   parsedEmail       String?
   parsedPhone       String?
-  skills            String[] @default([])
-  experienceKeywords String[] @default([])
-  educationKeywords String[] @default([])
-  preferredRoles    String[] @default([])
+  skills            String[]
+  experienceKeywords String[]
+  educationKeywords String[]
+  preferredRoles    String[]
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  versions          ResumeVersion[]
-  exportLogs        ExportLog[]
-  coverLetters      CoverLetter[]
   createdAt         DateTime @default(now())
-  updatedAt         DateTime @default(now()) @updatedAt
-
-  @@index([userId, updatedAt])
-}
-
-model CoverLetter {
-  id             String   @id @default(cuid())
-  userId         String
-  resumeId       String?
-  title          String   @default("Untitled Cover Letter")
-  templateKey    String   @default("classic-professional")
-  templateFamily CoverLetterTemplateFamily @default(CLASSIC_PROFESSIONAL)
-  templateTier   TemplateTier @default(FREE)
-  status         DocumentStatus @default(DRAFT)
-  draftData      Json
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  resume         Resume?  @relation(fields: [resumeId], references: [id], onDelete: SetNull)
-  exportLogs     ExportLog[]
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @default(now()) @updatedAt
-
-  @@index([userId, updatedAt])
-}
-
-model ResumeVersion {
-  id         String   @id @default(cuid())
-  userId     String
-  resumeId   String
-  label      String   @default("Draft")
-  snapshot   Json
-  createdAt  DateTime @default(now())
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  resume     Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
-
-  @@index([resumeId, createdAt])
-}
-
-model ExportLog {
-  id             String       @id @default(cuid())
-  userId         String
-  resumeId       String?
-  coverLetterId  String?
-  kind           ExportKind
-  status         ExportStatus @default(QUEUED)
-  fileUrl        String?
-  meta           Json?
-  createdAt      DateTime     @default(now())
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  resume         Resume?      @relation(fields: [resumeId], references: [id], onDelete: SetNull)
-  coverLetter    CoverLetter? @relation(fields: [coverLetterId], references: [id], onDelete: SetNull)
-
-  @@index([userId, createdAt])
 }
 
 model JobSearch {

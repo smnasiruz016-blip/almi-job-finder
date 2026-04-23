@@ -14,8 +14,8 @@ const displayFont = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Almi CV Builder",
-  description: "Create professional CVs and matching cover letters with polished templates, live preview, and export-ready structure.",
+  title: "AlmiJob Finder",
+  description: "An almiworld job search product for resume-first matching, worldwide discovery, and smarter applications.",
   icons: {
     icon: "/brand/almi-latest.png",
     apple: "/brand/almi-latest.png"

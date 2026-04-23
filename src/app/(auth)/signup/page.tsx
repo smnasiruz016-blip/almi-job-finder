@@ -17,15 +17,15 @@ export default async function SignUpPage() {
         <section className="glass-panel rounded-[2rem] p-8">
           <Image src="/brand/almi-latest.png" alt="Almiworld" width={180} height={70} className="h-auto w-[150px]" />
           <h1 className="mt-6 font-[family-name:var(--font-display)] text-4xl font-bold text-slate-950">
-            Create your Almi CV account
+            Start your search
           </h1>
           <p className="mt-3 text-sm leading-7 text-slate-600">
-            Start building professional CVs and matching cover letters with polished templates, live previews, and saved drafts.
+            Build a more complete job-search workflow with resume-first ranking, saved searches, and upgrade-ready alerts.
           </p>
           <ul className="mt-5 space-y-2 text-sm leading-7 text-slate-600">
-            <li>- Choose from premium-feeling CV templates</li>
-            <li>- Build matching cover letters faster</li>
-            <li>- Save drafts and keep improving over time</li>
+            <li>- Upload your resume and extract matching signals</li>
+            <li>- Search jobs across live and fallback providers</li>
+            <li>- Save roles and improve your resume before applying</li>
           </ul>
         </section>
         <div>

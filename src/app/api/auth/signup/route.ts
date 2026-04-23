@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   });
 
   if (existing) {
-    return jsonError("You already have an Almiworld account with that email. Log in to continue.", 409);
+    return jsonError("An account with that email already exists.");
   }
 
   const user = await prisma.user.create({
