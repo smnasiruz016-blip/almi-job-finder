@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "key": "classic-professional",
+    "name": "Classic Professional",
+    "description": "Traditional business-style cover letter for safe, formal applications.",
+    "previewLabel": "Formal and dependable",
+    "kind": "coverLetter",
+    "tier": "FREE"
+  },
+  "family": "CLASSIC_PROFESSIONAL",
+  "layout": {
+    "mode": "classic-letter",
+    "showSignatureLine": true
+  },
+  "theme": {
+    "accent": "#0f172a",
+    "accentSoft": "#e2e8f0",
+    "surface": "#ffffff",
+    "text": "#111827",
+    "muted": "#6b7280"
+  },
+  "visibleSections": ["jobTitle", "company", "hiringManager", "intro", "body", "closing"]
+}

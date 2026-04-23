@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "key": "bold-contemporary",
+    "name": "Bold Contemporary",
+    "description": "Premium letter layout with stronger accent treatment for standout applications.",
+    "previewLabel": "Confident and modern",
+    "kind": "coverLetter",
+    "tier": "PREMIUM"
+  },
+  "family": "BOLD_CONTEMPORARY",
+  "layout": {
+    "mode": "modern-letter",
+    "showSignatureLine": true
+  },
+  "theme": {
+    "accent": "#7c3aed",
+    "accentSoft": "#ede9fe",
+    "surface": "#ffffff",
+    "text": "#111827",
+    "muted": "#6b7280"
+  },
+  "visibleSections": ["jobTitle", "company", "hiringManager", "intro", "body", "closing"]
+}

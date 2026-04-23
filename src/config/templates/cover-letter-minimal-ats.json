@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "key": "minimal-ats-letter",
+    "name": "Minimal ATS",
+    "description": "Lightweight layout for ATS-safe and recruiter-friendly cover letters.",
+    "previewLabel": "Minimal and easy to scan",
+    "kind": "coverLetter",
+    "tier": "FREE"
+  },
+  "family": "MINIMAL_ATS",
+  "layout": {
+    "mode": "classic-letter",
+    "showSignatureLine": true
+  },
+  "theme": {
+    "accent": "#1d4ed8",
+    "accentSoft": "#dbeafe",
+    "surface": "#ffffff",
+    "text": "#0f172a",
+    "muted": "#64748b"
+  },
+  "visibleSections": ["jobTitle", "company", "hiringManager", "intro", "body", "closing"]
+}

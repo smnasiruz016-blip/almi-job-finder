@@ -1,0 +1,26 @@
+{
+  "metadata": {
+    "key": "modern-professional",
+    "name": "Modern Professional",
+    "description": "Elegant two-column balance for modern professionals.",
+    "previewLabel": "Professional with a polished edge",
+    "kind": "resume",
+    "tier": "FREE"
+  },
+  "family": "MODERN_PROFESSIONAL",
+  "layout": {
+    "mode": "two-column",
+    "density": "comfortable",
+    "showPhoto": true,
+    "sidebarSections": ["skills", "certifications", "links"],
+    "mainSections": ["summary", "experience", "education", "projects"]
+  },
+  "theme": {
+    "accent": "#0f766e",
+    "accentSoft": "#ccfbf1",
+    "surface": "#ffffff",
+    "text": "#111827",
+    "muted": "#6b7280"
+  },
+  "visibleSections": ["basics", "summary", "experience", "education", "skills", "projects", "certifications", "links"]
+}

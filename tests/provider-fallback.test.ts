@@ -120,4 +120,61 @@ describe("provider fallback", () => {
       ])
     );
   });
+
+  it("filters out live jobs that do not satisfy a specific city and country search", async () => {
+    process.env.REMOTE_OK_ENABLED = "true";
+    process.env.REMOTIVE_ENABLED = "false";
+    process.env.ADZUNA_ENABLED = "false";
+    process.env.MOCK_FALLBACK_ENABLED = "false";
+
+    vi.spyOn(global, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify([
+          {
+            id: 1,
+            position: "SVP Sales",
+            company: "InMarket",
+            location: "Remote (US-Only)",
+            url: "https://remoteok.com/remote-jobs/1",
+            description: "<p>US-only remote leadership role</p>",
+            tags: ["sales"],
+            date: "2026-04-21T00:00:00.000Z"
+          },
+          {
+            id: 2,
+            position: "Sales Lead",
+            company: "Local Growth Co",
+            location: "Lahore, Punjab, Pakistan",
+            url: "https://remoteok.com/remote-jobs/2",
+            description: "<p>Lead the Lahore commercial team</p>",
+            tags: ["sales"],
+            date: "2026-04-21T00:00:00.000Z"
+          }
+        ]),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        }
+      )
+    );
+
+    const { fetchFromAdapters } = await import("@/server/adapters/provider-registry");
+    const input: JobSearchInput = {
+      desiredTitle: "sales",
+      country: "Pakistan",
+      state: "Punjab",
+      city: "Lahore"
+    };
+
+    const result = await fetchFromAdapters(input);
+
+    expect(result.usedFallback).toBe(false);
+    expect(result.jobs).toHaveLength(1);
+    expect(result.jobs[0]).toEqual(
+      expect.objectContaining({
+        title: "Sales Lead",
+        location: "Lahore, Punjab, Pakistan"
+      })
+    );
+  });
 });

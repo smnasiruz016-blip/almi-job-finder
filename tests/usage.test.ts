@@ -35,7 +35,10 @@ describe("usage limits", () => {
         label: "Pro",
         dailySearchLimit: null,
         features: {
+          canExportWithoutBranding: true,
+          canUseAiWriting: true,
           canUseAlerts: true,
+          canUsePremiumTemplates: true,
           canUseResumeInsights: true,
           hasUnlimitedSearches: true
         }
@@ -69,7 +72,10 @@ describe("usage limits", () => {
         label: "Free",
         dailySearchLimit: 5,
         features: {
+          canExportWithoutBranding: false,
+          canUseAiWriting: false,
           canUseAlerts: false,
+          canUsePremiumTemplates: false,
           canUseResumeInsights: false,
           hasUnlimitedSearches: false
         }

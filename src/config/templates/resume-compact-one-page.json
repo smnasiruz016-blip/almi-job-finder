@@ -1,0 +1,26 @@
+{
+  "metadata": {
+    "key": "compact-one-page",
+    "name": "Compact One-Page",
+    "description": "Dense one-page layout for focused, concise applications.",
+    "previewLabel": "Great for fresh graduates and short resumes",
+    "kind": "resume",
+    "tier": "FREE"
+  },
+  "family": "COMPACT_ONE_PAGE",
+  "layout": {
+    "mode": "single-column",
+    "density": "compact",
+    "showPhoto": false,
+    "sidebarSections": [],
+    "mainSections": ["summary", "experience", "education", "skills", "projects", "links"]
+  },
+  "theme": {
+    "accent": "#475569",
+    "accentSoft": "#e2e8f0",
+    "surface": "#ffffff",
+    "text": "#0f172a",
+    "muted": "#64748b"
+  },
+  "visibleSections": ["basics", "summary", "experience", "education", "skills", "projects", "links"]
+}

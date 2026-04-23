@@ -4,6 +4,9 @@ export type PlanFeatures = {
   canUseAlerts: boolean;
   canUseResumeInsights: boolean;
   hasUnlimitedSearches: boolean;
+  canUsePremiumTemplates: boolean;
+  canUseAiWriting: boolean;
+  canExportWithoutBranding: boolean;
 };
 
 export type PlanSnapshot = {

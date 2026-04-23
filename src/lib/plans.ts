@@ -10,7 +10,10 @@ const PLAN_DEFINITIONS: Record<SubscriptionTier, PlanSnapshot> = {
     features: {
       canUseAlerts: false,
       canUseResumeInsights: false,
-      hasUnlimitedSearches: false
+      hasUnlimitedSearches: false,
+      canUsePremiumTemplates: false,
+      canUseAiWriting: false,
+      canExportWithoutBranding: false
     }
   },
   PRO: {
@@ -20,7 +23,10 @@ const PLAN_DEFINITIONS: Record<SubscriptionTier, PlanSnapshot> = {
     features: {
       canUseAlerts: true,
       canUseResumeInsights: true,
-      hasUnlimitedSearches: true
+      hasUnlimitedSearches: true,
+      canUsePremiumTemplates: true,
+      canUseAiWriting: true,
+      canExportWithoutBranding: true
     }
   }
 };
@@ -43,4 +49,16 @@ export function hasUnlimitedSearches(tier: SubscriptionTier) {
 
 export function getDailySearchLimitForTier(tier: SubscriptionTier) {
   return getPlanDefinition(tier).dailySearchLimit;
+}
+
+export function canUsePremiumTemplates(tier: SubscriptionTier) {
+  return getPlanDefinition(tier).features.canUsePremiumTemplates;
+}
+
+export function canUseAiWriting(tier: SubscriptionTier) {
+  return getPlanDefinition(tier).features.canUseAiWriting;
+}
+
+export function canExportWithoutBranding(tier: SubscriptionTier) {
+  return getPlanDefinition(tier).features.canExportWithoutBranding;
 }

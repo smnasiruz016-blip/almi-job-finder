@@ -1,0 +1,26 @@
+{
+  "metadata": {
+    "key": "creative-portfolio",
+    "name": "Creative Portfolio",
+    "description": "Soft visual styling for designers, creators, and freelancers.",
+    "previewLabel": "Creative without losing structure",
+    "kind": "resume",
+    "tier": "PREMIUM"
+  },
+  "family": "CREATIVE_PORTFOLIO",
+  "layout": {
+    "mode": "two-column",
+    "density": "comfortable",
+    "showPhoto": true,
+    "sidebarSections": ["skills", "links", "certifications"],
+    "mainSections": ["summary", "experience", "projects", "education"]
+  },
+  "theme": {
+    "accent": "#db2777",
+    "accentSoft": "#fce7f3",
+    "surface": "#fffafc",
+    "text": "#1f2937",
+    "muted": "#6b7280"
+  },
+  "visibleSections": ["basics", "summary", "experience", "education", "skills", "projects", "certifications", "links"]
+}

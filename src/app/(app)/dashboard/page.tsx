@@ -1,65 +1,35 @@
-import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { DashboardShell } from "@/components/dashboard/dashboard-shell";
-import { getLatestParsedResume } from "@/server/services/resume-service";
-import { getSearchUsageForUser } from "@/server/services/usage";
+import { getPlanDefinition } from "@/lib/plans";
+import { DashboardShell } from "@/components/documents/dashboard-shell";
+import { listDocumentsForDashboard } from "@/server/services/document-service";
 
 export default async function DashboardPage() {
   const user = await requireUser();
-  const [resume, savedJobs, savedSearches, history, usage] = await Promise.all([
-    getLatestParsedResume(user.id),
-    prisma.savedJob.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: "desc" },
-      take: 5
-    }),
-    prisma.savedSearch.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: "desc" },
-      take: 5
-    }),
-    prisma.jobSearch.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: "desc" },
-      take: 5
-    }),
-    getSearchUsageForUser(user.id)
-  ]);
+  let resumes: Awaited<ReturnType<typeof listDocumentsForDashboard>>["resumes"] = [];
+  let coverLetters: Awaited<ReturnType<typeof listDocumentsForDashboard>>["coverLetters"] = [];
+
+  try {
+    const documents = await listDocumentsForDashboard(user.id);
+    resumes = documents.resumes;
+    coverLetters = documents.coverLetters;
+  } catch {
+    resumes = [];
+    coverLetters = [];
+  }
+  const plan = getPlanDefinition(user.subscriptionTier);
 
   return (
     <DashboardShell
-      user={user}
-      resume={resume}
-      usage={usage}
-      initialSavedJobs={savedJobs}
-      initialSavedSearches={savedSearches.map((search) => ({
-        id: search.id,
-        name: search.name,
-        alertsEnabled: search.alertsEnabled,
-        alertFrequency: search.alertFrequency,
-        lastAlertedAt: search.lastAlertedAt?.toISOString() ?? null
+      userName={user.name}
+      resumes={resumes.map((item) => ({
+        ...item,
+        updatedAt: item.updatedAt.toISOString()
       }))}
-      initialHistory={history.map((entry) => ({
-        id: entry.id,
-        createdAt: entry.createdAt.toISOString(),
-        resultsCount: Array.isArray(entry.latestResults) ? entry.latestResults.length : 0,
-        desiredTitle: entry.desiredTitle,
-        keyword: entry.keyword ?? "",
-        country: entry.country,
-        snapshot: {
-          desiredTitle: entry.desiredTitle,
-          keyword: entry.keyword ?? null,
-          company: entry.company ?? null,
-          country: entry.country,
-          state: entry.state ?? null,
-          city: entry.city ?? null,
-          remoteMode: entry.remoteMode ?? null,
-          employmentType: entry.employmentType ?? null,
-          postedWithinDays: entry.postedWithinDays ?? null,
-          salaryMin: entry.salaryMin ?? null,
-          salaryMax: entry.salaryMax ?? null
-        }
+      coverLetters={coverLetters.map((item) => ({
+        ...item,
+        updatedAt: item.updatedAt.toISOString()
       }))}
+      plan={plan}
     />
   );
 }

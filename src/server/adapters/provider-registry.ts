@@ -1,4 +1,4 @@
-import { mapCountryToAdzunaCode } from "@/lib/location";
+import { filterJobsBySearchLocation, mapCountryToAdzunaCode, matchesSearchLocation } from "@/lib/location";
 import { log } from "@/lib/logger";
 import { getProviderRuntimeConfig } from "@/server/adapters/provider-config";
 import type { JobSourceAdapter } from "@/server/adapters/types";
@@ -72,6 +72,11 @@ function sanitizeRemotiveJobs(payload: unknown): RemotiveApiJob[] {
 function buildDescriptionSnippet(value: string | undefined, fallback: string) {
   const snippet = (value ?? "")
     .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, "\"")
+    .replace(/&#39;/gi, "'")
+    .replace(/[Â�]+/g, " ")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 240);
@@ -89,13 +94,6 @@ function textMatchesQuery(value: string, query?: string) {
     .split(/\s+/)
     .filter(Boolean)
     .every((part) => value.includes(part));
-}
-
-function getLocationNeedles(input: JobSearchInput) {
-  return [input.city, input.state, input.country]
-    .filter((value): value is string => Boolean(value && value.trim()))
-    .map((value) => value.trim().toLowerCase())
-    .filter((value) => value !== "worldwide");
 }
 
 function matchesPostedWithin(postedDate: string | undefined, postedWithinDays?: number) {
@@ -230,8 +228,9 @@ class RemoteOkAdapter implements JobSourceAdapter {
           ? Boolean(job.postedDate) &&
             Date.now() - new Date(job.postedDate!).getTime() <= input.postedWithinDays * 24 * 60 * 60 * 1000
           : true;
+        const locationMatch = matchesSearchLocation(job.location, input, job.descriptionSnippet);
 
-        return titleMatch && keywordMatch && companyMatch && salaryMatch && postedMatch;
+        return titleMatch && keywordMatch && companyMatch && salaryMatch && postedMatch && locationMatch;
       });
   }
 }
@@ -265,17 +264,15 @@ class RemotiveAdapter implements JobSourceAdapter {
     }
 
     const jobs = sanitizeRemotiveJobs(await response.json()).map((job) => normalizeRemotiveJob(job));
-    const locationNeedles = getLocationNeedles(input);
     const titleNeedle = input.desiredTitle.trim().toLowerCase();
     const keywordNeedle = (input.keyword ?? "").trim().toLowerCase();
 
     return jobs.filter((job) => {
       const haystack = `${job.title} ${job.descriptionSnippet} ${job.keywords.join(" ")}`.toLowerCase();
-      const locationHaystack = `${job.location} ${job.descriptionSnippet}`.toLowerCase();
       const titleMatch = textMatchesQuery(haystack, titleNeedle);
       const keywordMatch = textMatchesQuery(haystack, keywordNeedle);
       const companyMatch = input.company ? job.company.toLowerCase().includes(input.company.toLowerCase()) : true;
-      const locationMatch = locationNeedles.length ? locationNeedles.some((needle) => locationHaystack.includes(needle)) : true;
+      const locationMatch = matchesSearchLocation(job.location, input, job.descriptionSnippet);
       const postedMatch = matchesPostedWithin(job.postedDate, input.postedWithinDays);
 
       return titleMatch && keywordMatch && companyMatch && locationMatch && postedMatch;
@@ -355,7 +352,7 @@ export async function fetchFromAdapters(input: JobSearchInput) {
 
   for (const adapter of liveAdapters) {
     try {
-      const jobs = await adapter.searchJobs(input);
+      const jobs = filterJobsBySearchLocation(await adapter.searchJobs(input), input);
       liveResults.push(...jobs);
       providerStatuses.push({
         source: adapter.source,
@@ -388,7 +385,11 @@ export async function fetchFromAdapters(input: JobSearchInput) {
   }
 
   const shouldUseFallback = liveResults.length === 0 && config.mockFallbackEnabled;
-  const fallbackJobs = shouldUseFallback ? (await Promise.all(mockOnlyAdapters.map((adapter) => adapter.searchJobs(input)))).flat() : [];
+  const fallbackJobs = shouldUseFallback
+    ? (await Promise.all(mockOnlyAdapters.map((adapter) => adapter.searchJobs(input)))).flat().filter((job) =>
+        matchesSearchLocation(job.location, input, job.descriptionSnippet)
+      )
+    : [];
 
   if (shouldUseFallback) {
     for (const adapter of mockOnlyAdapters) {

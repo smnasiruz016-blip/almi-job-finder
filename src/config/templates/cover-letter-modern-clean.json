@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "key": "modern-clean",
+    "name": "Modern Clean",
+    "description": "Fresh modern spacing with a crisp opening block.",
+    "previewLabel": "Simple and polished",
+    "kind": "coverLetter",
+    "tier": "FREE"
+  },
+  "family": "MODERN_CLEAN",
+  "layout": {
+    "mode": "modern-letter",
+    "showSignatureLine": true
+  },
+  "theme": {
+    "accent": "#0f766e",
+    "accentSoft": "#ccfbf1",
+    "surface": "#ffffff",
+    "text": "#111827",
+    "muted": "#6b7280"
+  },
+  "visibleSections": ["jobTitle", "company", "hiringManager", "intro", "body", "closing"]
+}

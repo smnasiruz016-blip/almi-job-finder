@@ -1,0 +1,26 @@
+{
+  "metadata": {
+    "key": "minimal-ats",
+    "name": "Minimal ATS",
+    "description": "Clean one-column layout built for clarity and ATS-friendly reading.",
+    "previewLabel": "Simple, safe, and recruiter-friendly",
+    "kind": "resume",
+    "tier": "FREE"
+  },
+  "family": "MINIMAL_ATS",
+  "layout": {
+    "mode": "single-column",
+    "density": "comfortable",
+    "showPhoto": false,
+    "sidebarSections": [],
+    "mainSections": ["summary", "experience", "education", "skills", "projects", "certifications", "links"]
+  },
+  "theme": {
+    "accent": "#1d4ed8",
+    "accentSoft": "#dbeafe",
+    "surface": "#ffffff",
+    "text": "#0f172a",
+    "muted": "#64748b"
+  },
+  "visibleSections": ["basics", "summary", "experience", "education", "skills", "projects", "certifications", "links"]
+}
