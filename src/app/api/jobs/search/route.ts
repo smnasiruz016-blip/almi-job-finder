@@ -31,52 +31,88 @@ export async function POST(request: Request) {
   }
 
   try {
-    await assertUserCanSearch(user.id);
-    const resume = await getLatestParsedResume(user.id);
-    const result = await runJobSearch(user.id, parsed.data, resume);
-    const usage = await getSearchUsageForUser(user.id);
-    await trackProductEvent({
-      name: "job_search_performed",
-      userId: user.id,
-      properties: {
-        desiredTitle: parsed.data.desiredTitle,
-        hasResume: Boolean(resume),
-        resultCount: result.results.length,
-        usedFallback: result.meta.usedFallback,
-        liveSourceCount: result.meta.providerStatuses?.filter((provider) => provider.sourceType === "live" && provider.status === "success").length ?? 0,
-        country: parsed.data.country?.trim() || "Worldwide",
-        hasKeyword: Boolean(parsed.data.keyword)
+    try {
+      await assertUserCanSearch(user.id);
+    } catch (error) {
+      if (error instanceof SearchLimitExceededError) {
+        log("warn", "Search blocked by free plan limit", {
+          userId: user.id,
+          dailyUsed: error.usage.dailyUsed,
+          dailyLimit: error.usage.dailyLimit
+        });
+        await trackProductEvent({
+          name: "plan_limit_hit",
+          userId: user.id,
+          properties: {
+            dailyUsed: error.usage.dailyUsed,
+            dailyLimit: error.usage.dailyLimit,
+            tier: error.usage.tier
+          }
+        });
+        return Response.json(
+          {
+            error: `You have used all ${error.usage.dailyLimit ?? 0} searches for today on the ${error.usage.plan.label} plan. Try again tomorrow or upgrade for unlimited searches.`,
+            code: "SEARCH_LIMIT_REACHED",
+            usage: error.usage
+          },
+          { status: 403 }
+        );
       }
-    });
+
+      log("error", "Search usage enforcement failed, continuing search", {
+        userId: user.id,
+        error: error instanceof Error ? error.message : "Unknown"
+      });
+    }
+
+    let resume = null;
+    try {
+      resume = await getLatestParsedResume(user.id);
+    } catch (error) {
+      log("error", "Resume lookup failed for search, continuing without resume", {
+        userId: user.id,
+        error: error instanceof Error ? error.message : "Unknown"
+      });
+    }
+
+    const result = await runJobSearch(user.id, parsed.data, resume);
+
+    let usage = null;
+    try {
+      usage = await getSearchUsageForUser(user.id);
+    } catch (error) {
+      log("error", "Search usage refresh failed after search", {
+        userId: user.id,
+        error: error instanceof Error ? error.message : "Unknown"
+      });
+    }
+
+    try {
+      await trackProductEvent({
+        name: "job_search_performed",
+        userId: user.id,
+        properties: {
+          desiredTitle: parsed.data.desiredTitle,
+          hasResume: Boolean(resume),
+          resultCount: result.results.length,
+          usedFallback: result.meta.usedFallback,
+          liveSourceCount: result.meta.providerStatuses?.filter((provider) => provider.sourceType === "live" && provider.status === "success").length ?? 0,
+          country: parsed.data.country?.trim() || "Worldwide",
+          hasKeyword: Boolean(parsed.data.keyword)
+        }
+      });
+    } catch (error) {
+      log("error", "Search analytics tracking failed", {
+        userId: user.id,
+        error: error instanceof Error ? error.message : "Unknown"
+      });
+    }
+
     return Response.json({
       ...result,
       usage
     });
   } catch (error) {
-    if (error instanceof SearchLimitExceededError) {
-      log("warn", "Search blocked by free plan limit", {
-        userId: user.id,
-        dailyUsed: error.usage.dailyUsed,
-        dailyLimit: error.usage.dailyLimit
-      });
-      await trackProductEvent({
-        name: "plan_limit_hit",
-        userId: user.id,
-        properties: {
-          dailyUsed: error.usage.dailyUsed,
-          dailyLimit: error.usage.dailyLimit,
-          tier: error.usage.tier
-        }
-      });
-      return Response.json(
-        {
-          error: `You have used all ${error.usage.dailyLimit ?? 0} searches for today on the ${error.usage.plan.label} plan. Try again tomorrow or upgrade for unlimited searches.`,
-          code: "SEARCH_LIMIT_REACHED",
-          usage: error.usage
-        },
-        { status: 403 }
-      );
-    }
     log("error", "Job search failed", {
       userId: user.id,
       error: error instanceof Error ? error.message : "Unknown"

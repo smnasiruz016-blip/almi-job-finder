@@ -387,7 +387,9 @@ export function DashboardShell({
       return;
     }
 
-    setSearchUsage(data.usage);
+    if (data.usage) {
+      setSearchUsage(data.usage);
+    }
     setResults(data.results);
     setSelectedJob(data.results[0] ?? null);
     setSearchMeta(data.meta ?? null);

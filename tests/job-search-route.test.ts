@@ -227,4 +227,73 @@ describe("POST /api/jobs/search", () => {
       })
     );
   });
+
+  it("still returns search results when usage refresh fails", async () => {
+    mocks.getRequiredUser.mockResolvedValue({
+      id: "user_1",
+      email: "demo@example.com",
+      name: "Demo User",
+      role: "USER",
+      subscriptionTier: "FREE"
+    });
+    mocks.assertUserCanSearch.mockResolvedValue(undefined);
+    mocks.getLatestParsedResume.mockResolvedValue(null);
+    mocks.runJobSearch.mockResolvedValue({
+      searchId: null,
+      results: [
+        {
+          externalJobId: "job_2",
+          source: "Remotive",
+          title: "Sales Executive",
+          company: "Acme",
+          location: "Lahore, Punjab, Pakistan",
+          descriptionSnippet: "Drive outbound sales",
+          applyUrl: "https://example.com/jobs/2",
+          keywords: [],
+          matchScore: 74,
+          matchReasons: ["Strong title match"],
+          missingKeywords: []
+        }
+      ],
+      meta: {
+        usedFallback: false,
+        providerStatuses: [
+          {
+            source: "Remotive",
+            sourceType: "live",
+            status: "success",
+            results: 1
+          }
+        ]
+      }
+    });
+    mocks.getSearchUsageForUser.mockRejectedValue(new Error("Search history table unavailable"));
+
+    const { POST } = await import("@/app/api/jobs/search/route");
+    const response = await POST(
+      new Request("http://localhost/api/jobs/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          desiredTitle: "Sales",
+          country: "Pakistan",
+          state: "Punjab",
+          city: "Lahore"
+        })
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(
+      expect.objectContaining({
+        results: expect.arrayContaining([
+          expect.objectContaining({
+            title: "Sales Executive",
+            location: "Lahore, Punjab, Pakistan"
+          })
+        ]),
+        usage: null
+      })
+    );
+  });
 });
