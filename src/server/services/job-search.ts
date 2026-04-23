@@ -1,3 +1,4 @@
+import { log } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { fetchFromAdapters } from "@/server/adapters/provider-registry";
 import { rankJobs } from "@/server/services/ranking";
@@ -172,63 +173,75 @@ export async function executeJobSearch(input: JobSearchInput, resume?: ParsedRes
 
 export async function runJobSearch(userId: string, input: JobSearchInput, resume?: ParsedResume | null) {
   const { normalizedInput, results: ranked, meta } = await executeJobSearch(input, resume);
+  let searchId: string | null = null;
 
-  const search = await prisma.jobSearch.create({
-    data: {
+  try {
+    const search = await prisma.jobSearch.create({
+      data: {
+        userId,
+        desiredTitle: normalizedInput.desiredTitle,
+        keyword: normalizedInput.keyword,
+        company: normalizedInput.company,
+        country: normalizedInput.country ?? "Worldwide",
+        state: normalizedInput.state,
+        city: normalizedInput.city,
+        remoteMode: normalizedInput.remoteMode,
+        employmentType: normalizedInput.employmentType,
+        postedWithinDays: normalizedInput.postedWithinDays,
+        salaryMin: normalizedInput.salaryMin,
+        salaryMax: normalizedInput.salaryMax,
+        latestResults: ranked
+      }
+    });
+    searchId = search.id;
+
+    await prisma.searchHistory.create({
+      data: {
+        userId,
+        searchId: search.id,
+        snapshot: normalizedInput,
+        resultsCount: ranked.length
+      }
+    });
+
+    for (const job of ranked) {
+      await prisma.jobResultCache.upsert({
+        where: {
+          externalJobId_source: {
+            externalJobId: job.externalJobId,
+            source: job.source
+          }
+        },
+        update: {
+          payload: job,
+          title: job.title,
+          company: job.company,
+          location: job.location,
+          postedDate: job.postedDate ? new Date(job.postedDate) : null
+        },
+        create: {
+          externalJobId: job.externalJobId,
+          source: job.source,
+          title: job.title,
+          company: job.company,
+          location: job.location,
+          postedDate: job.postedDate ? new Date(job.postedDate) : null,
+          payload: job
+        }
+      });
+    }
+  } catch (error) {
+    log("error", "Job search persistence failed", {
       userId,
       desiredTitle: normalizedInput.desiredTitle,
-      keyword: normalizedInput.keyword,
-      company: normalizedInput.company,
-      country: normalizedInput.country ?? "Worldwide",
-      state: normalizedInput.state,
-      city: normalizedInput.city,
-      remoteMode: normalizedInput.remoteMode,
-      employmentType: normalizedInput.employmentType,
-      postedWithinDays: normalizedInput.postedWithinDays,
-      salaryMin: normalizedInput.salaryMin,
-      salaryMax: normalizedInput.salaryMax,
-      latestResults: ranked
-    }
-  });
-
-  await prisma.searchHistory.create({
-    data: {
-      userId,
-      searchId: search.id,
-      snapshot: normalizedInput,
-      resultsCount: ranked.length
-    }
-  });
-
-  for (const job of ranked) {
-    await prisma.jobResultCache.upsert({
-      where: {
-        externalJobId_source: {
-          externalJobId: job.externalJobId,
-          source: job.source
-        }
-      },
-      update: {
-        payload: job,
-        title: job.title,
-        company: job.company,
-        location: job.location,
-        postedDate: job.postedDate ? new Date(job.postedDate) : null
-      },
-      create: {
-        externalJobId: job.externalJobId,
-        source: job.source,
-        title: job.title,
-        company: job.company,
-        location: job.location,
-        postedDate: job.postedDate ? new Date(job.postedDate) : null,
-        payload: job
-      }
+      country: normalizedInput.country,
+      resultCount: ranked.length,
+      error: error instanceof Error ? error.message : "Unknown error"
     });
   }
 
   return {
-    searchId: search.id,
+    searchId,
     results: ranked,
     meta
   };

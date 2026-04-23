@@ -391,18 +391,20 @@ export function DashboardShell({
     setResults(data.results);
     setSelectedJob(data.results[0] ?? null);
     setSearchMeta(data.meta ?? null);
-    setHistory((current) => [
-      {
-        id: data.searchId,
-        createdAt: new Date().toISOString(),
-        resultsCount: data.results.length,
-        desiredTitle: String(payload.desiredTitle ?? ""),
-        keyword: String(payload.keyword ?? ""),
-        country: String(payload.country ?? "Worldwide") || "Worldwide",
-        snapshot: createSnapshotFromForm(formState)
-      },
-      ...current.filter((entry) => entry.id !== data.searchId)
-    ].slice(0, 6));
+    if (data.searchId) {
+      setHistory((current) => [
+        {
+          id: data.searchId,
+          createdAt: new Date().toISOString(),
+          resultsCount: data.results.length,
+          desiredTitle: String(payload.desiredTitle ?? ""),
+          keyword: String(payload.keyword ?? ""),
+          country: String(payload.country ?? "Worldwide") || "Worldwide",
+          snapshot: createSnapshotFromForm(formState)
+        },
+        ...current.filter((entry) => entry.id !== data.searchId)
+      ].slice(0, 6));
+    }
 
     if (data.results.length === 0) {
       const liveUnavailable = (data.meta?.providerStatuses ?? []).some(
