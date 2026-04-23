@@ -70,7 +70,7 @@ export default async function HomePage() {
             )}
             <Link
               href={primaryHref}
-              className="rounded-full bg-slate-950 px-5 py-2.5 text-white transition hover:bg-slate-800"
+              className="rounded-full bg-teal-100 px-5 py-2.5 text-teal-900 transition hover:bg-teal-200"
             >
               {user ? "Open dashboard" : "Start free"}
             </Link>

@@ -1,30 +1,43 @@
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { log } from "@/lib/logger";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { getLatestParsedResume } from "@/server/services/resume-service";
 import { getSearchUsageForUser } from "@/server/services/usage";
 
 export default async function DashboardPage() {
   const user = await requireUser();
-  const [resume, savedJobs, savedSearches, history, usage] = await Promise.all([
-    getLatestParsedResume(user.id),
-    prisma.savedJob.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: "desc" },
-      take: 5
-    }),
-    prisma.savedSearch.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: "desc" },
-      take: 5
-    }),
-    prisma.jobSearch.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: "desc" },
-      take: 5
-    }),
-    getSearchUsageForUser(user.id)
-  ]);
+  let resume = null;
+  let savedJobs: Awaited<ReturnType<typeof prisma.savedJob.findMany>> = [];
+  let savedSearches: Awaited<ReturnType<typeof prisma.savedSearch.findMany>> = [];
+  let history: Awaited<ReturnType<typeof prisma.jobSearch.findMany>> = [];
+  const usage = await getSearchUsageForUser(user.id);
+
+  try {
+    [resume, savedJobs, savedSearches, history] = await Promise.all([
+      getLatestParsedResume(user.id),
+      prisma.savedJob.findMany({
+        where: { userId: user.id },
+        orderBy: { createdAt: "desc" },
+        take: 5
+      }),
+      prisma.savedSearch.findMany({
+        where: { userId: user.id },
+        orderBy: { createdAt: "desc" },
+        take: 5
+      }),
+      prisma.jobSearch.findMany({
+        where: { userId: user.id },
+        orderBy: { createdAt: "desc" },
+        take: 5
+      })
+    ]);
+  } catch (error) {
+    log("error", "Dashboard data fallback activated", {
+      userId: user.id,
+      error: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
 
   return (
     <DashboardShell
