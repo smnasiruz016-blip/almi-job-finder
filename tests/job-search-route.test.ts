@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => {
     getRequiredUser: vi.fn(),
     getLatestParsedResume: vi.fn(),
     runJobSearch: vi.fn(),
+    executeJobSearch: vi.fn(),
     assertUserCanSearch: vi.fn(),
     getSearchUsageForUser: vi.fn(),
     trackProductEvent: vi.fn(),
@@ -27,7 +28,8 @@ vi.mock("@/server/services/resume-service", () => ({
 }));
 
 vi.mock("@/server/services/job-search", () => ({
-  runJobSearch: mocks.runJobSearch
+  runJobSearch: mocks.runJobSearch,
+  executeJobSearch: mocks.executeJobSearch
 }));
 
 vi.mock("@/lib/analytics", () => ({
@@ -293,6 +295,68 @@ describe("POST /api/jobs/search", () => {
           })
         ]),
         usage: null
+      })
+    );
+  });
+
+  it("returns an empty provider-unavailable state when both search execution paths fail", async () => {
+    mocks.getRequiredUser.mockResolvedValue({
+      id: "user_1",
+      email: "demo@example.com",
+      name: "Demo User",
+      role: "USER",
+      subscriptionTier: "FREE"
+    });
+    mocks.assertUserCanSearch.mockResolvedValue(undefined);
+    mocks.getLatestParsedResume.mockResolvedValue(null);
+    mocks.runJobSearch.mockRejectedValue(new Error("Search persistence pipeline failed"));
+    mocks.executeJobSearch.mockRejectedValue(new Error("Provider execution failed"));
+    mocks.getSearchUsageForUser.mockResolvedValue({
+      dailyUsed: 1,
+      dailyLimit: 5,
+      remaining: 4,
+      tier: "FREE",
+      plan: {
+        tier: "FREE",
+        label: "Free",
+        dailySearchLimit: 5,
+        features: {
+          canUseAlerts: false,
+          canUseResumeInsights: false,
+          hasUnlimitedSearches: false
+        }
+      }
+    });
+
+    const { POST } = await import("@/app/api/jobs/search/route");
+    const response = await POST(
+      new Request("http://localhost/api/jobs/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          desiredTitle: "Sales",
+          country: "Pakistan",
+          state: "Punjab",
+          city: "Lahore"
+        })
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(
+      expect.objectContaining({
+        searchId: null,
+        results: [],
+        meta: expect.objectContaining({
+          usedFallback: false,
+          providerStatuses: expect.arrayContaining([
+            expect.objectContaining({
+              sourceType: "live",
+              status: "error",
+              results: 0
+            })
+          ])
+        })
       })
     );
   });
