@@ -110,6 +110,9 @@ Before redeploying on Vercel, make sure these environment variables are set in t
 - `REMOTIVE_ENABLED`
 - `REMOTIVE_API_URL`
 - `REMOTIVE_REVALIDATE_SECONDS`
+- `JOOBLE_ENABLED`
+- `JOOBLE_API_URL`
+- `JOOBLE_API_KEY`
 - `ADZUNA_ENABLED`
 - `ADZUNA_API_URL`
 - `ADZUNA_APP_ID`
@@ -140,6 +143,7 @@ export interface JobSourceAdapter {
 Current implementation:
 - `RemoteOK` live adapter
 - `Remotive` public API adapter
+- `Jooble` live adapter when an API key is configured
 - `Adzuna` live adapter when credentials are configured
 - `MockGreenhouse`
 - `MockLever`
@@ -158,6 +162,9 @@ Provider environment variables:
 - `REMOTIVE_ENABLED`: set to `false` to disable Remotive
 - `REMOTIVE_API_URL`: override the Remotive public API endpoint if needed
 - `REMOTIVE_REVALIDATE_SECONDS`: conservative cache interval for the Remotive public API request
+- `JOOBLE_ENABLED`: set to `false` to disable Jooble
+- `JOOBLE_API_URL`: base Jooble API URL
+- `JOOBLE_API_KEY`: required for Jooble live results
 - `ADZUNA_ENABLED`: set to `false` to disable Adzuna entirely
 - `ADZUNA_API_URL`: base Adzuna API URL
 - `ADZUNA_APP_ID` and `ADZUNA_APP_KEY`: required for Adzuna live results
@@ -180,6 +187,11 @@ Remotive note:
 - The app is wired to `https://remotive.com/api/remote-jobs` by default through `REMOTIVE_API_URL`.
 - The normalized output preserves Remotive attribution and uses the Remotive job URL so the UI can show the source clearly.
 - The public API has usage constraints and delayed listings, so the integration uses a conservative cache interval and does not scrape the site.
+
+Jooble note:
+- The app is wired to `https://jooble.org/api` by default through `JOOBLE_API_URL`.
+- Jooble requires `JOOBLE_API_KEY` to be configured before the adapter will run.
+- This adapter is useful for stronger location-based coverage beyond the mostly remote inventories from RemoteOK and Remotive.
 
 ## Alerts
 

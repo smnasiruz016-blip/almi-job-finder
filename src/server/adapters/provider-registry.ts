@@ -56,6 +56,23 @@ type RemotiveApiJob = {
   tags?: string[];
 };
 
+type JoobleApiResponse = {
+  jobs?: JoobleApiJob[];
+};
+
+type JoobleApiJob = {
+  id?: number | string;
+  title?: string;
+  company?: string;
+  location?: string;
+  link?: string;
+  salary?: string;
+  type?: string;
+  snippet?: string;
+  source?: string;
+  updated?: string;
+};
+
 function sanitizeRemotiveJobs(payload: unknown): RemotiveApiJob[] {
   if (!payload || typeof payload !== "object" || !("jobs" in payload)) {
     return [];
@@ -96,6 +113,19 @@ function getLocationNeedles(input: JobSearchInput) {
     .filter((value): value is string => Boolean(value && value.trim()))
     .map((value) => value.trim().toLowerCase())
     .filter((value) => value !== "worldwide");
+}
+
+function sanitizeJoobleJobs(payload: unknown): JoobleApiJob[] {
+  if (!payload || typeof payload !== "object" || !("jobs" in payload)) {
+    return [];
+  }
+
+  const jobs = (payload as JoobleApiResponse).jobs;
+  if (!Array.isArray(jobs)) {
+    return [];
+  }
+
+  return jobs.filter((item): item is JoobleApiJob => typeof item === "object" && item !== null);
 }
 
 function matchesLocationNeedles(location: string, description: string, needles: string[]) {
@@ -199,6 +229,28 @@ export function normalizeRemotiveJob(job: RemotiveApiJob): NormalizedJob {
   };
 }
 
+export function normalizeJoobleJob(job: JoobleApiJob, input: JobSearchInput): NormalizedJob {
+  return {
+    externalJobId: String(job.id ?? `${job.title ?? "job"}-${job.company ?? "company"}-${job.location ?? "location"}`),
+    source: "Jooble",
+    sourceType: "live",
+    title: job.title ?? input.desiredTitle,
+    company: job.company ?? "Unknown company",
+    location: job.location ?? input.country ?? "Worldwide",
+    salary: job.salary?.trim() || undefined,
+    jobType: job.type?.toUpperCase().replace(/[-\s]+/g, "_"),
+    remoteStatus: input.remoteMode,
+    descriptionSnippet: buildDescriptionSnippet(job.snippet, "Role supplied by Jooble."),
+    applyUrl: job.link ?? "",
+    postedDate: job.updated,
+    keywords: [input.desiredTitle, input.keyword, job.title ?? "", job.company ?? "", job.source ?? ""].filter(Boolean) as string[],
+    providerMetadata: {
+      attributionLabel: "Source: Jooble",
+      attributionUrl: job.link
+    }
+  };
+}
+
 class RemoteOkAdapter implements JobSourceAdapter {
   source = "RemoteOK";
   sourceType = "live" as const;
@@ -293,6 +345,61 @@ class RemotiveAdapter implements JobSourceAdapter {
   }
 }
 
+class JoobleAdapter implements JobSourceAdapter {
+  source = "Jooble";
+  sourceType = "live" as const;
+
+  isEnabled() {
+    const config = getProviderRuntimeConfig();
+    return config.joobleEnabled && Boolean(config.joobleApiKey);
+  }
+
+  async searchJobs(input: JobSearchInput): Promise<NormalizedJob[]> {
+    const config = getProviderRuntimeConfig();
+    const endpoint = `${config.joobleApiUrl.replace(/\/+$/, "")}/${config.joobleApiKey}`;
+    const locationNeedles = getLocationNeedles(input);
+    const titleNeedle = input.desiredTitle.trim().toLowerCase();
+    const keywordNeedle = (input.keyword ?? "").trim().toLowerCase();
+    const locationQuery = [input.city, input.state, input.country].filter(Boolean).join(", ");
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        keywords: [input.desiredTitle, input.keyword].filter(Boolean).join(" ").trim(),
+        location: locationQuery || undefined,
+        page: 1
+      }),
+      next: { revalidate: 1800 }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Jooble request failed with status ${response.status}`);
+    }
+
+    const jobs = sanitizeJoobleJobs(await response.json()).map((job) => normalizeJoobleJob(job, input));
+
+    return jobs.filter((job) => {
+      const haystack = `${job.title} ${job.descriptionSnippet} ${job.keywords.join(" ")}`.toLowerCase();
+      const titleMatch = textMatchesQuery(haystack, titleNeedle);
+      const keywordMatch = textMatchesQuery(haystack, keywordNeedle);
+      const companyMatch = input.company ? job.company.toLowerCase().includes(input.company.toLowerCase()) : true;
+      const locationMatch = matchesLocationNeedles(job.location, job.descriptionSnippet, locationNeedles);
+      const salaryMatch = input.salaryMin
+        ? (() => {
+            const numericSalary = Number((job.salary ?? "").replace(/[^0-9]/g, ""));
+            return Number.isFinite(numericSalary) ? numericSalary >= input.salaryMin : true;
+          })()
+        : true;
+      const postedMatch = matchesPostedWithin(job.postedDate, input.postedWithinDays);
+
+      return titleMatch && keywordMatch && companyMatch && locationMatch && salaryMatch && postedMatch;
+    });
+  }
+}
+
 class AdzunaAdapter implements JobSourceAdapter {
   source = "Adzuna";
   sourceType = "live" as const;
@@ -351,7 +458,9 @@ class AdzunaAdapter implements JobSourceAdapter {
 }
 
 export function getJobAdapters() {
-  return [new RemoteOkAdapter(), new RemotiveAdapter(), new AdzunaAdapter(), ...mockAdapters].filter((adapter) => adapter.isEnabled());
+  return [new RemoteOkAdapter(), new RemotiveAdapter(), new JoobleAdapter(), new AdzunaAdapter(), ...mockAdapters].filter((adapter) =>
+    adapter.isEnabled()
+  );
 }
 
 export async function fetchFromAdapters(input: JobSearchInput) {
