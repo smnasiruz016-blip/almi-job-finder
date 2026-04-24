@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { Activity, BellRing, Bookmark, BriefcaseBusiness, Globe2, Search, Sparkles, Star, UploadCloud } from "lucide-react";
+import { Activity, BellRing, Bookmark, BriefcaseBusiness, ExternalLink, Globe2, Search, Sparkles, Star, UploadCloud } from "lucide-react";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { JobCard } from "@/components/dashboard/job-card";
 import { MatchScore } from "@/components/dashboard/match-score";
@@ -14,6 +14,7 @@ import { buildProfileInsights } from "@/lib/profile-insights";
 import { buildResumeSuggestions } from "@/lib/resume-suggestions";
 import { buildResultsSummary, buildUsageSupportCopy } from "@/lib/search-trust";
 import { COUNTRY_OPTIONS, getCityOptions, getRegionOptions } from "@/lib/location-data";
+import { getTrustedSourcesForCountry } from "@/lib/source-directory";
 import { canUseAlerts, canUseResumeInsights } from "@/lib/plans";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -346,6 +347,13 @@ export function DashboardShell({
   const roleSuggestions = useMemo(() => getRoleSuggestions(formState.desiredTitle), [formState.desiredTitle]);
   const advertisedSkills = useMemo(() => collectAdvertisedSkills(results), [results]);
   const suggestedSkills = useMemo(() => getSuggestedSkillOptions(formState.desiredTitle, results), [formState.desiredTitle, results]);
+  const trustedSources = useMemo(() => {
+    if (sortedResults.length > 0) {
+      return [];
+    }
+
+    return getTrustedSourcesForCountry(formState.country);
+  }, [formState.country, sortedResults.length]);
 
   function updateForm<K extends keyof SearchFormState>(key: K, value: SearchFormState[K]) {
     setFormState((current) => ({ ...current, [key]: value }));
@@ -1265,13 +1273,55 @@ export function DashboardShell({
             {searchStatus.type === "loading" ? (
               <ResultSkeleton />
             ) : sortedResults.length === 0 ? (
-              <EmptyState
-                title={searchFeedbackState?.title ?? "No jobs found yet"}
-                description={searchFeedbackState?.description ?? "Try broadening your title, removing a strict filter, or searching again in a moment."}
-                nextStep={searchFeedbackState?.nextStep ?? "Adjust one filter, then search again."}
-                details={searchFeedbackState?.details}
-                variant={searchFeedbackState?.variant ?? "warning"}
-              />
+              <div className="space-y-4">
+                <EmptyState
+                  title={searchFeedbackState?.title ?? "No jobs found yet"}
+                  description={searchFeedbackState?.description ?? "Try broadening your title, removing a strict filter, or searching again in a moment."}
+                  nextStep={searchFeedbackState?.nextStep ?? "Adjust one filter, then search again."}
+                  details={searchFeedbackState?.details}
+                  variant={searchFeedbackState?.variant ?? "warning"}
+                />
+                {trustedSources.length > 0 && (
+                  <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-2xl bg-teal-50 p-3 text-teal-700">
+                        <Globe2 className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-slate-900">
+                          Trusted job websites for {formState.country === "Worldwide" ? "worldwide search" : formState.country}
+                        </h3>
+                        <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-600">
+                          Live provider coverage is still thin for this search. These trusted external job websites are a good next step while we keep expanding worldwide provider coverage.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      {trustedSources.map((source) => (
+                        <a
+                          key={`${formState.country}-${source.name}`}
+                          href={source.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4 transition hover:-translate-y-0.5 hover:border-teal-200 hover:bg-white hover:shadow-sm"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="font-semibold text-slate-900">{source.name}</p>
+                            <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 ring-1 ring-slate-200">
+                              {source.category}
+                            </span>
+                          </div>
+                          <p className="mt-3 text-sm leading-6 text-slate-600">{source.note}</p>
+                          <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-teal-700">
+                            Open source
+                            <ExternalLink className="h-4 w-4" />
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : view === "cards" ? (
               <div className="grid gap-4">
                 {sortedResults.map((job) => (
