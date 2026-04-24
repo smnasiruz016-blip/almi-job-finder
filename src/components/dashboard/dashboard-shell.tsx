@@ -9,6 +9,7 @@ import { PlanCard } from "@/components/dashboard/plan-card";
 import { ResultSkeleton } from "@/components/dashboard/result-skeleton";
 import { buildSavedSearchSectionCopy, buildSearchFeedbackState, buildUploadErrorState } from "@/lib/dashboard-copy";
 import { buildAlertOverview, buildSetupChecklist } from "@/lib/dashboard-insights";
+import { collectAdvertisedSkills, getRoleProfile, getRoleSuggestions, getSuggestedSkillOptions, ROLE_OPTIONS } from "@/lib/job-taxonomy";
 import { buildProfileInsights } from "@/lib/profile-insights";
 import { buildResumeSuggestions } from "@/lib/resume-suggestions";
 import { buildResultsSummary, buildUsageSupportCopy } from "@/lib/search-trust";
@@ -341,9 +342,26 @@ export function DashboardShell({
   const searchFeedbackState =
     searchStatus.type === "error" || searchStatus.type === "empty" ? buildSearchFeedbackState(searchStatus) : null;
   const uploadErrorState = uploadStatus.type === "error" ? buildUploadErrorState(uploadStatus) : null;
+  const selectedRoleProfile = useMemo(() => getRoleProfile(formState.desiredTitle), [formState.desiredTitle]);
+  const roleSuggestions = useMemo(() => getRoleSuggestions(formState.desiredTitle), [formState.desiredTitle]);
+  const advertisedSkills = useMemo(() => collectAdvertisedSkills(results), [results]);
+  const suggestedSkills = useMemo(() => getSuggestedSkillOptions(formState.desiredTitle, results), [formState.desiredTitle, results]);
 
   function updateForm<K extends keyof SearchFormState>(key: K, value: SearchFormState[K]) {
     setFormState((current) => ({ ...current, [key]: value }));
+  }
+
+  function applySuggestedSkill(skill: string) {
+    const currentKeywords = formState.keyword
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (currentKeywords.some((item) => item.toLowerCase() === skill.toLowerCase())) {
+      return;
+    }
+
+    updateForm("keyword", [...currentKeywords, skill].join(", "));
   }
 
   function applyPreset(values: Partial<SearchFormState>) {
@@ -752,9 +770,134 @@ export function DashboardShell({
             </div>
           </div>
 
+          <div className="mt-5 rounded-[1.5rem] bg-white p-4 ring-1 ring-slate-200">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="font-semibold text-slate-900">Role and skill picker</p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Choose a target role and add the skills companies are commonly asking for in that path.
+                </p>
+              </div>
+              {selectedRoleProfile ? (
+                <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-800">
+                  {selectedRoleProfile.category}
+                </span>
+              ) : null}
+            </div>
+
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <Select
+                value={selectedRoleProfile?.title ?? ""}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (value) {
+                    updateForm("desiredTitle", value);
+                  }
+                }}
+              >
+                <option value="">Choose a common role</option>
+                {ROLE_OPTIONS.map((role) => (
+                  <option key={role} value={role}>
+                    {role}
+                  </option>
+                ))}
+              </Select>
+
+              <Select
+                value=""
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (value) {
+                    applySuggestedSkill(value);
+                  }
+                }}
+                disabled={!suggestedSkills.length}
+              >
+                <option value="">{suggestedSkills.length ? "Add a role-based skill" : "Choose a role first"}</option>
+                {suggestedSkills.map((skill) => (
+                  <option key={skill} value={skill}>
+                    {skill}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            {selectedRoleProfile ? (
+              <div className="mt-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Popular skills for this role</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {selectedRoleProfile.skills.map((skill) => (
+                    <button
+                      key={skill}
+                      type="button"
+                      onClick={() => applySuggestedSkill(skill)}
+                      className="rounded-full bg-slate-100 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-teal-50 hover:text-teal-800"
+                    >
+                      {skill}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {advertisedSkills.length ? (
+              <div className="mt-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Skills seen in live openings</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {advertisedSkills.slice(0, 10).map((skill) => (
+                    <button
+                      key={skill}
+                      type="button"
+                      onClick={() => applySuggestedSkill(skill)}
+                      className="rounded-full bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 transition hover:bg-amber-100"
+                    >
+                      {skill}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  These come from the current live result set, so they reflect what employers are advertising right now.
+                </p>
+              </div>
+            ) : null}
+          </div>
+
           <div className="mt-5 grid gap-4 md:grid-cols-2">
-            <Input name="desiredTitle" placeholder="Desired job title" required value={formState.desiredTitle} onChange={(event) => updateForm("desiredTitle", event.target.value)} />
-            <Input name="keyword" placeholder="Keyword or skill (optional)" value={formState.keyword} onChange={(event) => updateForm("keyword", event.target.value)} />
+            <div className="space-y-2">
+              <Input
+                name="desiredTitle"
+                placeholder="Desired job title"
+                required
+                list="desired-role-options"
+                value={formState.desiredTitle}
+                onChange={(event) => updateForm("desiredTitle", event.target.value)}
+              />
+              <datalist id="desired-role-options">
+                {(roleSuggestions.length ? roleSuggestions : ROLE_OPTIONS.slice(0, 12)).map((role) => (
+                  <option key={role} value={role} />
+                ))}
+              </datalist>
+              <p className="px-1 text-xs text-slate-500">
+                Choose from common roles or type your own target job title. The role picker helps the app match your CV against the right opening family.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Input
+                name="keyword"
+                placeholder="Keyword or skill (optional)"
+                list="skill-options"
+                value={formState.keyword}
+                onChange={(event) => updateForm("keyword", event.target.value)}
+              />
+              <datalist id="skill-options">
+                {suggestedSkills.map((skill) => (
+                  <option key={skill} value={skill} />
+                ))}
+              </datalist>
+              <p className="px-1 text-xs text-slate-500">
+                Add one or more skills to help the app compare your CV against the role more accurately. Skills are suggested from role patterns and live company demand.
+              </p>
+            </div>
             <Input name="company" placeholder="Company (optional)" value={formState.company} onChange={(event) => updateForm("company", event.target.value)} />
             <Select
               name="country"
