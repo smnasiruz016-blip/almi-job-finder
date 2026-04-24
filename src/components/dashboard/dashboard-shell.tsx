@@ -415,12 +415,17 @@ export function DashboardShell({
       const liveNoMatches = (data.meta?.providerStatuses ?? []).some(
         (provider: ProviderStatus) => provider.sourceType === "live" && provider.status === "no_matches"
       );
+      const suggestedQueryReplacement = data.meta?.insights?.suggestedQueryReplacement as string | null | undefined;
+      const queryHint =
+        suggestedQueryReplacement && suggestedQueryReplacement.toLowerCase() !== formState.desiredTitle.trim().toLowerCase()
+          ? ` Try "${suggestedQueryReplacement}" as the role title next.`
+          : "";
       setSearchStatus({
         type: "empty",
         message: liveUnavailable
           ? "Live job providers are temporarily unavailable right now. Try again shortly or broaden your search."
           : liveNoMatches
-            ? "No live jobs matched this search yet. Try a broader title, country, or remote search."
+            ? `No live jobs matched this search yet. Try a broader title, country, or remote search.${queryHint}`
             : "No jobs found - try a broader search, add a keyword, or remove a strict location filter."
       });
       return;

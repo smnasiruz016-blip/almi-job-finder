@@ -55,7 +55,8 @@ function buildProviderUnavailableResult() {
         liveResults: 0,
         remoteResults: 0,
         salaryVisibleResults: 0,
-        topCompanies: [] as string[]
+        topCompanies: [] as string[],
+        suggestedQueryReplacement: null as string | null
       },
       quality: {
         averageMatchScore: 0,

@@ -1,5 +1,6 @@
 import { log } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
+import { getSuggestedQueryReplacement } from "@/lib/search-query";
 import { fetchFromAdapters } from "@/server/adapters/provider-registry";
 import { rankJobs } from "@/server/services/ranking";
 import type { JobSearchInput, NormalizedJob, ParsedResume, SearchInsights } from "@/types";
@@ -117,7 +118,8 @@ export function dedupeJobs<T extends NormalizedJob>(jobs: T[]) {
 }
 
 function buildSearchInsights<T extends { company: string; remoteStatus?: string; salaryMin?: number; salaryMax?: number; sourceType?: string }>(
-  jobs: T[]
+  jobs: T[],
+  input: JobSearchInput
 ): SearchInsights {
   const companyCounts = jobs.reduce<Record<string, number>>((acc, job) => {
     acc[job.company] = (acc[job.company] ?? 0) + 1;
@@ -132,7 +134,8 @@ function buildSearchInsights<T extends { company: string; remoteStatus?: string;
     topCompanies: Object.entries(companyCounts)
       .sort((left, right) => right[1] - left[1])
       .slice(0, 4)
-      .map(([company]) => company)
+      .map(([company]) => company),
+    suggestedQueryReplacement: getSuggestedQueryReplacement(input.desiredTitle) ?? getSuggestedQueryReplacement(input.keyword)
   };
 }
 
@@ -146,7 +149,7 @@ export async function executeJobSearch(input: JobSearchInput, resume?: ParsedRes
   const { jobs, usedFallback, sources, providerStatuses } = await fetchFromAdapters(normalizedInput);
   const results = dedupeJobs(jobs);
   const ranked = rankJobs(results, normalizedInput, resume);
-  const insights = buildSearchInsights(ranked);
+  const insights = buildSearchInsights(ranked, normalizedInput);
   const quality = {
     averageMatchScore: ranked.length ? Math.round(ranked.reduce((sum, job) => sum + job.matchScore, 0) / ranked.length) : 0,
     topMatchScore: ranked[0]?.matchScore ?? 0,

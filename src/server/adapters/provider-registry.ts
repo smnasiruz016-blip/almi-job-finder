@@ -1,5 +1,6 @@
 import { mapCountryToAdzunaCode } from "@/lib/location";
 import { log } from "@/lib/logger";
+import { getPreferredProviderQuery, matchesSearchQuery } from "@/lib/search-query";
 import { getProviderRuntimeConfig } from "@/server/adapters/provider-config";
 import type { JobSourceAdapter } from "@/server/adapters/types";
 import { mockAdapters } from "@/server/adapters/mock-jobs";
@@ -94,18 +95,6 @@ function buildDescriptionSnippet(value: string | undefined, fallback: string) {
     .slice(0, 240);
 
   return snippet || fallback;
-}
-
-function textMatchesQuery(value: string, query?: string) {
-  const trimmed = (query ?? "").trim().toLowerCase();
-  if (!trimmed) {
-    return true;
-  }
-
-  return trimmed
-    .split(/\s+/)
-    .filter(Boolean)
-    .every((part) => value.includes(part));
 }
 
 function getLocationNeedles(input: JobSearchInput) {
@@ -274,8 +263,8 @@ class RemoteOkAdapter implements JobSourceAdapter {
     }
 
     const data = sanitizeRemoteOkJobs(await response.json());
-    const titleNeedle = input.desiredTitle.trim().toLowerCase();
-    const keywordNeedle = (input.keyword ?? "").trim().toLowerCase();
+    const titleNeedle = getPreferredProviderQuery(input.desiredTitle);
+    const keywordNeedle = getPreferredProviderQuery(input.keyword);
     const locationNeedles = getLocationNeedles(input);
 
     return data
@@ -283,10 +272,8 @@ class RemoteOkAdapter implements JobSourceAdapter {
       .filter((job) => {
         const haystack = `${job.title} ${job.descriptionSnippet} ${job.keywords.join(" ")}`.toLowerCase();
         const locationMatch = matchesLocationNeedles(job.location, job.descriptionSnippet, locationNeedles);
-        const titleMatch = titleNeedle ? haystack.includes(titleNeedle) : true;
-        const keywordMatch = keywordNeedle
-          ? haystack.includes(keywordNeedle) || keywordNeedle.split(" ").every((part) => haystack.includes(part))
-          : true;
+        const titleMatch = matchesSearchQuery(haystack, titleNeedle);
+        const keywordMatch = matchesSearchQuery(haystack, keywordNeedle);
         const companyMatch = input.company ? job.company.toLowerCase().includes(input.company.toLowerCase()) : true;
         const salaryMatch = input.salaryMin ? (job.salaryMax ?? 0) >= input.salaryMin : true;
         const postedMatch = input.postedWithinDays
@@ -310,7 +297,10 @@ class RemotiveAdapter implements JobSourceAdapter {
   async searchJobs(input: JobSearchInput): Promise<NormalizedJob[]> {
     const config = getProviderRuntimeConfig();
     const url = new URL(config.remotiveApiUrl);
-    const query = [input.desiredTitle, input.keyword].filter(Boolean).join(" ").trim();
+    const query = [getPreferredProviderQuery(input.desiredTitle), getPreferredProviderQuery(input.keyword)]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
 
     if (query) {
       url.searchParams.set("search", query);
@@ -329,13 +319,13 @@ class RemotiveAdapter implements JobSourceAdapter {
 
     const jobs = sanitizeRemotiveJobs(await response.json()).map((job) => normalizeRemotiveJob(job));
     const locationNeedles = getLocationNeedles(input);
-    const titleNeedle = input.desiredTitle.trim().toLowerCase();
-    const keywordNeedle = (input.keyword ?? "").trim().toLowerCase();
+    const titleNeedle = getPreferredProviderQuery(input.desiredTitle);
+    const keywordNeedle = getPreferredProviderQuery(input.keyword);
 
     return jobs.filter((job) => {
       const haystack = `${job.title} ${job.descriptionSnippet} ${job.keywords.join(" ")}`.toLowerCase();
-      const titleMatch = textMatchesQuery(haystack, titleNeedle);
-      const keywordMatch = textMatchesQuery(haystack, keywordNeedle);
+      const titleMatch = matchesSearchQuery(haystack, titleNeedle);
+      const keywordMatch = matchesSearchQuery(haystack, keywordNeedle);
       const companyMatch = input.company ? job.company.toLowerCase().includes(input.company.toLowerCase()) : true;
       const locationMatch = matchesLocationNeedles(job.location, job.descriptionSnippet, locationNeedles);
       const postedMatch = matchesPostedWithin(job.postedDate, input.postedWithinDays);
@@ -358,8 +348,8 @@ class JoobleAdapter implements JobSourceAdapter {
     const config = getProviderRuntimeConfig();
     const endpoint = `${config.joobleApiUrl.replace(/\/+$/, "")}/${config.joobleApiKey}`;
     const locationNeedles = getLocationNeedles(input);
-    const titleNeedle = input.desiredTitle.trim().toLowerCase();
-    const keywordNeedle = (input.keyword ?? "").trim().toLowerCase();
+    const titleNeedle = getPreferredProviderQuery(input.desiredTitle);
+    const keywordNeedle = getPreferredProviderQuery(input.keyword);
     const locationQuery = [input.city, input.state, input.country].filter(Boolean).join(", ");
     const response = await fetch(endpoint, {
       method: "POST",
@@ -368,7 +358,7 @@ class JoobleAdapter implements JobSourceAdapter {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        keywords: [input.desiredTitle, input.keyword].filter(Boolean).join(" ").trim(),
+        keywords: [titleNeedle, keywordNeedle].filter(Boolean).join(" ").trim(),
         location: locationQuery || undefined,
         page: 1
       }),
@@ -383,8 +373,8 @@ class JoobleAdapter implements JobSourceAdapter {
 
     return jobs.filter((job) => {
       const haystack = `${job.title} ${job.descriptionSnippet} ${job.keywords.join(" ")}`.toLowerCase();
-      const titleMatch = textMatchesQuery(haystack, titleNeedle);
-      const keywordMatch = textMatchesQuery(haystack, keywordNeedle);
+      const titleMatch = matchesSearchQuery(haystack, titleNeedle);
+      const keywordMatch = matchesSearchQuery(haystack, keywordNeedle);
       const companyMatch = input.company ? job.company.toLowerCase().includes(input.company.toLowerCase()) : true;
       const locationMatch = matchesLocationNeedles(job.location, job.descriptionSnippet, locationNeedles);
       const salaryMatch = input.salaryMin
@@ -421,7 +411,10 @@ class AdzunaAdapter implements JobSourceAdapter {
     url.searchParams.set("app_id", config.adzunaAppId!);
     url.searchParams.set("app_key", config.adzunaAppKey!);
     url.searchParams.set("results_per_page", "20");
-    url.searchParams.set("what", [input.desiredTitle, input.keyword].filter(Boolean).join(" "));
+    url.searchParams.set(
+      "what",
+      [getPreferredProviderQuery(input.desiredTitle), getPreferredProviderQuery(input.keyword)].filter(Boolean).join(" ")
+    );
 
     const where = [input.city, input.state, input.country].filter(Boolean).join(", ");
     if (where) {

@@ -88,6 +88,7 @@ export type SearchInsights = {
   remoteResults: number;
   salaryVisibleResults: number;
   topCompanies: string[];
+  suggestedQueryReplacement?: string | null;
 };
 
 export type ProviderStatus = {
