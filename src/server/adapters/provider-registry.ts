@@ -98,6 +98,15 @@ function getLocationNeedles(input: JobSearchInput) {
     .filter((value) => value !== "worldwide");
 }
 
+function matchesLocationNeedles(location: string, description: string, needles: string[]) {
+  if (!needles.length) {
+    return true;
+  }
+
+  const haystack = `${location} ${description}`.toLowerCase();
+  return needles.some((needle) => haystack.includes(needle));
+}
+
 function matchesPostedWithin(postedDate: string | undefined, postedWithinDays?: number) {
   if (!postedWithinDays) {
     return true;
@@ -215,11 +224,13 @@ class RemoteOkAdapter implements JobSourceAdapter {
     const data = sanitizeRemoteOkJobs(await response.json());
     const titleNeedle = input.desiredTitle.trim().toLowerCase();
     const keywordNeedle = (input.keyword ?? "").trim().toLowerCase();
+    const locationNeedles = getLocationNeedles(input);
 
     return data
       .map((job) => normalizeRemoteOkJob(job))
       .filter((job) => {
         const haystack = `${job.title} ${job.descriptionSnippet} ${job.keywords.join(" ")}`.toLowerCase();
+        const locationMatch = matchesLocationNeedles(job.location, job.descriptionSnippet, locationNeedles);
         const titleMatch = titleNeedle ? haystack.includes(titleNeedle) : true;
         const keywordMatch = keywordNeedle
           ? haystack.includes(keywordNeedle) || keywordNeedle.split(" ").every((part) => haystack.includes(part))
@@ -231,7 +242,7 @@ class RemoteOkAdapter implements JobSourceAdapter {
             Date.now() - new Date(job.postedDate!).getTime() <= input.postedWithinDays * 24 * 60 * 60 * 1000
           : true;
 
-        return titleMatch && keywordMatch && companyMatch && salaryMatch && postedMatch;
+        return titleMatch && keywordMatch && companyMatch && salaryMatch && postedMatch && locationMatch;
       });
   }
 }
@@ -271,11 +282,10 @@ class RemotiveAdapter implements JobSourceAdapter {
 
     return jobs.filter((job) => {
       const haystack = `${job.title} ${job.descriptionSnippet} ${job.keywords.join(" ")}`.toLowerCase();
-      const locationHaystack = `${job.location} ${job.descriptionSnippet}`.toLowerCase();
       const titleMatch = textMatchesQuery(haystack, titleNeedle);
       const keywordMatch = textMatchesQuery(haystack, keywordNeedle);
       const companyMatch = input.company ? job.company.toLowerCase().includes(input.company.toLowerCase()) : true;
-      const locationMatch = locationNeedles.length ? locationNeedles.some((needle) => locationHaystack.includes(needle)) : true;
+      const locationMatch = matchesLocationNeedles(job.location, job.descriptionSnippet, locationNeedles);
       const postedMatch = matchesPostedWithin(job.postedDate, input.postedWithinDays);
 
       return titleMatch && keywordMatch && companyMatch && locationMatch && postedMatch;

@@ -120,4 +120,58 @@ describe("provider fallback", () => {
       ])
     );
   });
+
+  it("filters RemoteOK jobs by strict location filters", async () => {
+    process.env.REMOTE_OK_ENABLED = "true";
+    process.env.REMOTIVE_ENABLED = "false";
+    process.env.ADZUNA_ENABLED = "false";
+    process.env.MOCK_FALLBACK_ENABLED = "false";
+
+    const fetchMock = vi.spyOn(global, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify([
+          {
+            id: 1,
+            position: "Nurse",
+            company: "Evergreen Nephrology",
+            location: "Reykjavik, Iceland",
+            url: "https://remoteok.com/1",
+            description: "Clinical support role in Reykjavik, Iceland",
+            tags: ["nurse"]
+          },
+          {
+            id: 2,
+            position: "Nurse",
+            company: "US Remote Health",
+            location: "Remote (US only)",
+            url: "https://remoteok.com/2",
+            description: "Remote nursing role for candidates in the United States only",
+            tags: ["nurse"]
+          }
+        ]),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        }
+      )
+    );
+
+    const { fetchFromAdapters } = await import("@/server/adapters/provider-registry");
+    const input: JobSearchInput = {
+      desiredTitle: "nurs",
+      country: "Iceland",
+      city: "Reykjavik"
+    };
+
+    const result = await fetchFromAdapters(input);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result.jobs).toHaveLength(1);
+    expect(result.jobs[0]).toEqual(
+      expect.objectContaining({
+        company: "Evergreen Nephrology",
+        location: "Reykjavik, Iceland"
+      })
+    );
+  });
 });
