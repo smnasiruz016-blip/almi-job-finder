@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { Activity, BellRing, Bookmark, BriefcaseBusiness, ExternalLink, Globe2, Search, Sparkles, Star, UploadCloud } from "lucide-react";
+import { Activity, BellRing, Bookmark, BriefcaseBusiness, Building2, ExternalLink, Globe2, Search, Sparkles, Star, UploadCloud } from "lucide-react";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { JobCard } from "@/components/dashboard/job-card";
 import { MatchScore } from "@/components/dashboard/match-score";
@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrencyRange } from "@/lib/utils";
-import type { ParsedResume, ProviderStatus, RankedJob, SearchInsights, SearchUsageSnapshot, SessionUser } from "@/types";
+import type { EmployerInventoryOverview, ParsedResume, ProviderStatus, RankedJob, SearchInsights, SearchUsageSnapshot, SessionUser } from "@/types";
 
 type HistorySnapshot = {
   desiredTitle: string;
@@ -41,6 +41,7 @@ type DashboardShellProps = {
   user: SessionUser;
   resume: ParsedResume | null;
   usage: SearchUsageSnapshot;
+  employerInventory: EmployerInventoryOverview;
   initialSavedJobs: Array<{
     id: string;
     title: string;
@@ -224,6 +225,7 @@ export function DashboardShell({
   user,
   resume,
   usage,
+  employerInventory,
   initialSavedJobs,
   initialSavedSearches,
   initialHistory
@@ -752,7 +754,78 @@ export function DashboardShell({
           </div>
         </div>
 
-        <PlanCard usage={searchUsage} />
+        <div className="space-y-6">
+          <PlanCard usage={searchUsage} />
+
+          <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="rounded-2xl bg-blue-50 p-3 text-blue-700">
+                <Building2 className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-semibold text-slate-900">Companies hiring on Almiworld</p>
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+                  This is the direct-employer inventory layer. It will grow as companies start advertising vacancies inside Job Finder.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-[1.25rem] bg-slate-50 px-4 py-3">
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Hiring companies</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-950">{employerInventory.totalHiringCompanies}</p>
+              </div>
+              <div className="rounded-[1.25rem] bg-slate-50 px-4 py-3">
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Open vacancies</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-950">{employerInventory.totalOpenVacancies}</p>
+              </div>
+            </div>
+
+            {employerInventory.featuredCompanies.length > 0 ? (
+              <div className="mt-5 grid gap-3">
+                {employerInventory.featuredCompanies.map((company) => (
+                  <div key={company.id} className="rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-slate-900">{company.name}</p>
+                          {company.verified ? (
+                            <span className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">
+                              Verified
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {[company.city, company.country].filter(Boolean).join(", ")}{company.website ? " • direct employer" : ""}
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
+                        {company.openRoles} open role{company.openRoles === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                    {company.roleTitles.length > 0 ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {company.roleTitles.map((role) => (
+                          <span key={`${company.id}-${role}`} className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200">
+                            {role}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-5 rounded-[1.25rem] bg-blue-50 px-4 py-4 text-sm leading-7 text-blue-900">
+                Direct employer vacancies are being prepared now. Once companies start posting inside Job Finder, this section will show verified hiring companies and their open roles here.
+              </div>
+            )}
+
+            <p className="mt-4 text-xs text-slate-500">
+              Inventory source: {employerInventory.source === "database" ? "live company database" : employerInventory.source === "fallback" ? "groundwork ready - waiting for first company posts" : "temporary fallback mode"}
+            </p>
+          </div>
+        </div>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]" id="search">

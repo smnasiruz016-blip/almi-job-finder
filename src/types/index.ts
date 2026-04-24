@@ -98,3 +98,22 @@ export type ProviderStatus = {
   results: number;
   message?: string;
 };
+
+export type HiringCompanyPreview = {
+  id: string;
+  name: string;
+  slug: string;
+  website?: string | null;
+  country: string;
+  city?: string | null;
+  verified: boolean;
+  openRoles: number;
+  roleTitles: string[];
+};
+
+export type EmployerInventoryOverview = {
+  totalHiringCompanies: number;
+  totalOpenVacancies: number;
+  featuredCompanies: HiringCompanyPreview[];
+  source: "database" | "fallback" | "unavailable";
+};
