@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { BarChart3, BellRing, Bookmark, FileSearch2, Shield, Sparkles } from "lucide-react";
+import { BarChart3, BellRing, Bookmark, FileSearch2, Home, Shield, Sparkles } from "lucide-react";
 import { canUseAlerts, canUseResumeInsights, hasUnlimitedSearches } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 import type { SessionUser } from "@/types";
@@ -28,9 +28,22 @@ export function SidebarNav({ user, className }: SidebarNavProps) {
   return (
     <aside className={cn("glass-panel rounded-[2rem] p-5", className)}>
       <div className="border-b border-slate-200 pb-5">
-        <Image src="/brand/almi-latest.png" alt="Almiworld" width={180} height={70} className="h-auto w-[150px]" />
+        <a
+          href="https://www.almiworld.com"
+          className="inline-block rounded-2xl focus:outline-none focus:ring-4 focus:ring-teal-100"
+          aria-label="Go to Almiworld home"
+        >
+          <Image src="/brand/almi-latest.png" alt="Almiworld" width={180} height={70} className="h-auto w-[150px]" />
+        </a>
         <p className="mt-4 font-[family-name:var(--font-display)] text-xl font-bold text-slate-950">AlmiJob Finder</p>
         <p className="mt-2 text-sm leading-6 text-slate-500">almiworld&apos;s resume-first search, worldwide filtering, and launch-ready workflow.</p>
+        <a
+          href="https://www.almiworld.com"
+          className="mt-4 inline-flex items-center gap-2 rounded-full bg-teal-50 px-4 py-2 text-sm font-medium text-teal-800 transition hover:bg-teal-100"
+        >
+          <Home className="h-4 w-4" />
+          Home
+        </a>
       </div>
 
       <nav className="mt-5 space-y-2">

@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, BarChart3, BriefcaseBusiness, CheckCircle2, SearchCode, UploadCloud } from "lucide-react";
+import { ArrowRight, BarChart3, BriefcaseBusiness, CheckCircle2, Home, SearchCode, UploadCloud } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 
 const steps = [
@@ -55,7 +55,13 @@ export default async function HomePage() {
         <nav className="glass-panel flex flex-col gap-4 rounded-[2rem] px-5 py-4 md:flex-row md:items-center md:justify-between">
           <div>
             <div className="flex items-center gap-4">
-              <Image src="/brand/almi-latest.png" alt="Almiworld" width={170} height={60} className="h-auto w-[140px] md:w-[170px]" />
+              <a
+                href="https://www.almiworld.com"
+                className="rounded-2xl focus:outline-none focus:ring-4 focus:ring-teal-100"
+                aria-label="Go to Almiworld home"
+              >
+                <Image src="/brand/almi-latest.png" alt="Almiworld" width={170} height={60} className="h-auto w-[140px] md:w-[170px]" />
+              </a>
               <div>
                 <p className="font-[family-name:var(--font-display)] text-xl font-bold text-slate-950">AlmiJob Finder</p>
                 <p className="text-sm text-slate-500">almiworld&apos;s advanced job discovery product with resume-first matching.</p>
@@ -63,6 +69,13 @@ export default async function HomePage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-sm font-medium">
+            <a
+              href="https://www.almiworld.com"
+              className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-slate-600 transition hover:bg-slate-100"
+            >
+              <Home className="h-4 w-4" />
+              Home
+            </a>
             {!user && (
               <Link href="/login" className="rounded-full px-4 py-2 text-slate-600 transition hover:bg-slate-100">
                 Log in

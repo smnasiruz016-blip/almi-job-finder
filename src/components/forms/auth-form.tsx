@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -56,7 +57,21 @@ export function AuthForm({ mode }: AuthFormProps) {
       onSubmit={handleSubmit}
       className="glass-panel mx-auto w-full max-w-lg rounded-[2rem] p-6 md:p-8"
     >
-      <Image src="/brand/almi-latest.png" alt="Almiworld" width={160} height={60} className="h-auto w-[130px]" />
+      <div className="flex items-center justify-between gap-3">
+        <a
+          href="https://www.almiworld.com"
+          className="rounded-2xl focus:outline-none focus:ring-4 focus:ring-teal-100"
+          aria-label="Go to Almiworld home"
+        >
+          <Image src="/brand/almi-latest.png" alt="Almiworld" width={160} height={60} className="h-auto w-[130px]" />
+        </a>
+        <a
+          href="https://www.almiworld.com"
+          className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+        >
+          Home
+        </a>
+      </div>
       <div className="space-y-2">
         <span className="eyebrow mt-5">{mode === "login" ? "Welcome back" : "Create account"}</span>
         <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold text-slate-950">
@@ -80,6 +95,12 @@ export function AuthForm({ mode }: AuthFormProps) {
       <Button type="submit" disabled={loading} className="mt-6 w-full">
         {loading ? "Please wait..." : mode === "login" ? "Log in" : "Create account"}
       </Button>
+      <p className="mt-4 text-center text-sm text-slate-500">
+        {mode === "login" ? "Need an account?" : "Already have an account?"}{" "}
+        <Link href={mode === "login" ? "/signup" : "/login"} className="font-medium text-teal-700 hover:text-teal-800">
+          {mode === "login" ? "Start free" : "Log in"}
+        </Link>
+      </p>
     </form>
   );
 }
