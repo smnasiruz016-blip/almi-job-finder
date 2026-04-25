@@ -19,6 +19,12 @@ type JobSourceSeedRow = {
   active: boolean;
 };
 
+const COUNTRY_SOURCE_PRIORITIES: Record<string, string[]> = {
+  Iceland: ["alfred", "job.is", "linkedin jobs"],
+  Denmark: ["jobindex", "ofir", "linkedin jobs"],
+  Pakistan: ["rozee.pk", "mustakbil", "linkedin jobs"]
+};
+
 function uniqueByName(items: JobSourceLink[]) {
   const seen = new Set<string>();
   return items.filter((item) => {
@@ -72,7 +78,51 @@ function mergeTrustedSources(country: string | undefined, primary: JobSourceLink
   const primaryLocal = primary.filter((item) => item.region !== "Worldwide");
   const primaryGlobal = primary.filter((item) => item.region === "Worldwide" || !item.region);
 
-  return uniqueByName([...fallbackLocal, ...primaryLocal, ...primaryGlobal, ...fallbackGlobal]).slice(0, 6);
+  return sortTrustedSourcesForCountry(normalizedCountry, [
+    ...fallbackLocal,
+    ...primaryLocal,
+    ...primaryGlobal,
+    ...fallbackGlobal
+  ]).slice(0, 6);
+}
+
+function sortTrustedSourcesForCountry(country: string, items: JobSourceLink[]) {
+  const priorities = COUNTRY_SOURCE_PRIORITIES[country];
+
+  if (!priorities) {
+    return uniqueByName(items);
+  }
+
+  const uniqueItems = uniqueByName(items);
+  const priorityIndex = new Map(priorities.map((name, index) => [name, index]));
+
+  return uniqueItems.sort((left, right) => {
+    const leftKey = left.name.trim().toLowerCase();
+    const rightKey = right.name.trim().toLowerCase();
+    const leftPriority = priorityIndex.get(leftKey);
+    const rightPriority = priorityIndex.get(rightKey);
+
+    if (leftPriority !== undefined || rightPriority !== undefined) {
+      if (leftPriority === undefined) {
+        return 1;
+      }
+      if (rightPriority === undefined) {
+        return -1;
+      }
+      if (leftPriority !== rightPriority) {
+        return leftPriority - rightPriority;
+      }
+    }
+
+    const leftGlobal = left.region === "Worldwide" || !left.region;
+    const rightGlobal = right.region === "Worldwide" || !right.region;
+
+    if (leftGlobal !== rightGlobal) {
+      return leftGlobal ? 1 : -1;
+    }
+
+    return (left.sourcePriority ?? 999) - (right.sourcePriority ?? 999);
+  });
 }
 
 export async function isSourceDirectorySchemaReady() {
