@@ -113,40 +113,47 @@ export async function getEmployerInventoryOverview(): Promise<EmployerInventoryO
   }
 
   try {
-    const [countRow] = await prisma.$queryRawUnsafe<Array<{ totalHiringCompanies: number; totalOpenVacancies: number }>>(
-      `SELECT
-        COUNT(DISTINCT CASE WHEN v.id IS NOT NULL THEN c.id END)::int AS "totalHiringCompanies",
-        COUNT(v.id)::int AS "totalOpenVacancies"
-      FROM "Company" c
-      LEFT JOIN "Vacancy" v
-        ON v."companyId" = c.id
-       AND v.status = 'ACTIVE'`
-    );
+    const [totalHiringCompanies, totalOpenVacancies, companies] = await Promise.all([
+      prisma.company.count(),
+      prisma.vacancy.count({
+        where: {
+          status: VacancyStatus.ACTIVE
+        }
+      }),
+      prisma.company.findMany({
+        include: {
+          vacancies: {
+            orderBy: {
+              createdAt: "desc"
+            },
+            take: 6
+          }
+        },
+        orderBy: [{ verified: "desc" }, { createdAt: "desc" }],
+        take: 6
+      })
+    ]);
 
-    const featured = await prisma.$queryRawUnsafe<FeaturedCompanyRow[]>(
-      `SELECT
-        c.id,
-        c.name,
-        c.slug,
-        c.website,
-        c.country,
-        c.city,
-        c.verified,
-        COUNT(v.id)::int AS "openRoles",
-        COALESCE(ARRAY_REMOVE(ARRAY_AGG(DISTINCT v.title), NULL), ARRAY[]::text[]) AS "roleTitles"
-      FROM "Company" c
-      LEFT JOIN "Vacancy" v
-        ON v."companyId" = c.id
-       AND v.status = 'ACTIVE'
-      GROUP BY c.id, c.name, c.slug, c.website, c.country, c.city, c.verified
-      HAVING COUNT(v.id) > 0
-      ORDER BY c.verified DESC, COUNT(v.id) DESC, c.name ASC
-      LIMIT 6`
-    );
+    const featured = companies.map<FeaturedCompanyRow>((company) => {
+      const activeVacancies = company.vacancies.filter((vacancy) => vacancy.status === VacancyStatus.ACTIVE);
+      const roleSource = activeVacancies.length > 0 ? activeVacancies : company.vacancies;
+
+      return {
+        id: company.id,
+        name: company.name,
+        slug: company.slug,
+        website: company.website,
+        country: company.country,
+        city: company.city,
+        verified: company.verified,
+        openRoles: activeVacancies.length,
+        roleTitles: roleSource.map((vacancy) => vacancy.title).filter(Boolean).slice(0, 3)
+      };
+    });
 
     return {
-      totalHiringCompanies: Number(countRow?.totalHiringCompanies ?? 0),
-      totalOpenVacancies: Number(countRow?.totalOpenVacancies ?? 0),
+      totalHiringCompanies,
+      totalOpenVacancies,
       featuredCompanies: featured.map(toPreview),
       source: "database"
     };
