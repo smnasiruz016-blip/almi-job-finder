@@ -23,7 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrencyRange } from "@/lib/utils";
-import type { CountryBrowseJob, CountryHiringHighlights, EmployerInventoryOverview, JobSourceLink, ParsedResume, ProviderStatus, RankedJob, SearchInsights, SearchUsageSnapshot, SessionUser } from "@/types";
+import type { CountryBrowseJob, CountryHiringHighlights, CountryRoleSuggestion, EmployerInventoryOverview, JobSourceLink, ParsedResume, ProviderStatus, RankedJob, SearchInsights, SearchUsageSnapshot, SessionUser } from "@/types";
 
 type HistorySnapshot = {
   desiredTitle: string;
@@ -43,11 +43,12 @@ type DashboardShellProps = {
   user: SessionUser;
   resume: ParsedResume | null;
   usage: SearchUsageSnapshot;
-  detectedCountry: string;
   employerInventory: EmployerInventoryOverview;
   countryHighlights: CountryHiringHighlights;
   trustedCountrySources: JobSourceLink[];
   countrySampleJobs: CountryBrowseJob[];
+  countryRoleSuggestions: CountryRoleSuggestion[];
+  initialFormState: SearchFormState;
   initialResults: RankedJob[];
   initialSavedJobs: Array<{
     id: string;
@@ -250,11 +251,12 @@ export function DashboardShell({
   user,
   resume,
   usage,
-  detectedCountry,
   employerInventory,
   countryHighlights,
   trustedCountrySources,
   countrySampleJobs,
+  countryRoleSuggestions,
+  initialFormState,
   initialResults,
   initialSavedJobs,
   initialSavedSearches,
@@ -276,19 +278,7 @@ export function DashboardShell({
   const [saveSearchStatus, setSaveSearchStatus] = useState<InlineStatus>({ type: "idle" });
   const [searchMeta, setSearchMeta] = useState<SearchMeta | null>(null);
   const [trustedSources, setTrustedSources] = useState<JobSourceLink[]>([]);
-  const [formState, setFormState] = useState<SearchFormState>({
-    desiredTitle: "",
-    keyword: "",
-    company: "",
-    country: "Worldwide",
-    state: "",
-    city: "",
-    remoteMode: "",
-    employmentType: "",
-    postedWithinDays: "",
-    salaryMin: "",
-    salaryMax: ""
-  });
+  const [formState, setFormState] = useState<SearchFormState>(initialFormState);
   const alertsEnabledOnPlan = canUseAlerts(user.subscriptionTier);
   const resumeInsightsEnabledOnPlan = canUseResumeInsights(user.subscriptionTier);
   const resultsSectionRef = useRef<HTMLElement | null>(null);
@@ -562,12 +552,9 @@ export function DashboardShell({
     });
   }
 
-  async function handleSearch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function runSearch(payload: Record<string, string>, options?: { scrollToResults?: boolean }) {
     setSearchStatus({ type: "loading", message: "Searching live job providers..." });
     setSaveSearchStatus({ type: "idle" });
-    const formData = new FormData(event.currentTarget);
-    const payload = Object.fromEntries(formData.entries());
     setLastSearchPayload(payload);
 
     const response = await fetch("/api/jobs/search", {
@@ -636,6 +623,11 @@ export function DashboardShell({
             ? `No live jobs matched this search yet. Try a broader title, country, or remote search.${queryHint}`
             : "No jobs found - try a broader search, add a keyword, or remove a strict location filter."
       });
+      if (options?.scrollToResults !== false) {
+        window.requestAnimationFrame(() => {
+          resultsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      }
       return;
     }
 
@@ -649,6 +641,53 @@ export function DashboardShell({
     setSearchStatus({
       type: "success",
       message: `Found ${data.results.length} jobs from ${data.meta?.sources?.join(", ") ?? "available sources"}.${fallbackNote}${liveNoMatchNote}${highFitNote}`
+    });
+
+    if (options?.scrollToResults !== false) {
+      window.requestAnimationFrame(() => {
+        resultsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+  }
+
+  async function handleSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const payload = Object.fromEntries(
+      Array.from(formData.entries()).map(([key, value]) => [key, String(value)])
+    ) as Record<string, string>;
+    await runSearch(payload);
+  }
+
+  async function handleCountryRoleSearch(role: CountryRoleSuggestion) {
+    const nextFormState: SearchFormState = {
+      ...formState,
+      desiredTitle: role.desiredTitle,
+      keyword: role.keyword ?? "",
+      company: "",
+      country: countryHighlights.country,
+      state: "",
+      city: "",
+      remoteMode: "",
+      employmentType: "",
+      postedWithinDays: "",
+      salaryMin: "",
+      salaryMax: ""
+    };
+
+    setFormState(nextFormState);
+    await runSearch({
+      desiredTitle: nextFormState.desiredTitle,
+      keyword: nextFormState.keyword,
+      company: "",
+      country: nextFormState.country,
+      state: "",
+      city: "",
+      remoteMode: "",
+      employmentType: "",
+      postedWithinDays: "",
+      salaryMin: "",
+      salaryMax: ""
     });
   }
 
@@ -978,11 +1017,13 @@ export function DashboardShell({
           <PlanCard usage={searchUsage} />
 
           <CountryHiringPanel
-            title={`Jobs visitors can browse in ${detectedCountry}`}
+            title={`Jobs visitors can browse in ${countryHighlights.country}`}
             description="This gives visitors and signed-in users a cleaner country entry point before they narrow into a specific role search."
             highlights={countryHighlights}
             trustedSources={trustedCountrySources}
             sampleJobs={countrySampleJobs}
+            roleSuggestions={countryRoleSuggestions}
+            onRoleSelect={handleCountryRoleSearch}
             compact
           />
 

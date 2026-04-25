@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight, BarChart3, BriefcaseBusiness, CheckCircle2, Home, SearchCode, UploadCloud } from "lucide-react";
 import { CountryHiringPanel } from "@/components/dashboard/country-hiring-panel";
 import { getCurrentUser } from "@/lib/auth";
+import { buildCountryRoleLinks } from "@/lib/country-role-guidance";
 import { getCountryHiringHighlights } from "@/server/services/company-vacancies";
 import { getDetectedCountry } from "@/server/services/country-detection";
 import { executeJobSearch } from "@/server/services/job-search";
@@ -62,6 +63,7 @@ export default async function HomePage() {
     .slice(0, 4);
   const primaryHref = user ? "/dashboard" : "/signup";
   const uploadHref = user ? "/dashboard#search" : "/signup";
+  const roleSuggestions = buildCountryRoleLinks(detectedCountry, user ? "/dashboard" : "/signup");
 
   return (
     <main className="pb-20">
@@ -215,6 +217,7 @@ export default async function HomePage() {
           highlights={countryHighlights}
           trustedSources={trustedCountrySources}
           sampleJobs={sampleJobs}
+          roleSuggestions={roleSuggestions}
         />
       </section>
 

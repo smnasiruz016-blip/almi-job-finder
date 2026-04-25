@@ -1,7 +1,7 @@
 "use client";
 
 import { BriefcaseBusiness, Building2, ExternalLink, Globe2, MapPin } from "lucide-react";
-import type { CountryBrowseJob, CountryHiringHighlights, JobSourceLink } from "@/types";
+import type { CountryBrowseJob, CountryHiringHighlights, CountryRoleSuggestion, JobSourceLink } from "@/types";
 
 type CountryHiringPanelProps = {
   title: string;
@@ -9,6 +9,8 @@ type CountryHiringPanelProps = {
   highlights: CountryHiringHighlights;
   trustedSources: JobSourceLink[];
   sampleJobs?: CountryBrowseJob[];
+  roleSuggestions?: CountryRoleSuggestion[];
+  onRoleSelect?: (role: CountryRoleSuggestion) => void;
   compact?: boolean;
 };
 
@@ -30,7 +32,16 @@ function sourceBadges(source: JobSourceLink) {
   return badges.slice(0, 3);
 }
 
-export function CountryHiringPanel({ title, description, highlights, trustedSources, sampleJobs = [], compact = false }: CountryHiringPanelProps) {
+export function CountryHiringPanel({
+  title,
+  description,
+  highlights,
+  trustedSources,
+  sampleJobs = [],
+  roleSuggestions = [],
+  onRoleSelect,
+  compact = false
+}: CountryHiringPanelProps) {
   const showEmployerVacancies = highlights.vacancies.length > 0;
   const showSampleJobs = sampleJobs.length > 0;
 
@@ -56,6 +67,40 @@ export function CountryHiringPanel({ title, description, highlights, trustedSour
           <p className="mt-2 text-2xl font-semibold text-slate-950">{highlights.totalVacancies}</p>
         </div>
       </div>
+
+      {roleSuggestions.length > 0 ? (
+        <div className="mt-5">
+          <div className="flex items-center gap-2">
+            <BriefcaseBusiness className="h-4 w-4 text-slate-500" />
+            <p className="text-sm font-semibold text-slate-900">Popular searches in {highlights.country}</p>
+          </div>
+          <p className="mt-1 text-sm leading-6 text-slate-500">
+            Start with a local role search instead of guessing the exact wording companies use.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {roleSuggestions.map((role) =>
+              onRoleSelect ? (
+                <button
+                  key={`${highlights.country}-${role.desiredTitle}-${role.keyword ?? "base"}`}
+                  type="button"
+                  onClick={() => onRoleSelect(role)}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-800"
+                >
+                  {role.label}
+                </button>
+              ) : role.href ? (
+                <a
+                  key={`${highlights.country}-${role.desiredTitle}-${role.keyword ?? "base"}`}
+                  href={role.href}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-800"
+                >
+                  {role.label}
+                </a>
+              ) : null
+            )}
+          </div>
+        </div>
+      ) : null}
 
       {showEmployerVacancies ? (
         <div className={`mt-5 grid gap-3 ${compact ? "" : "xl:grid-cols-2"}`}>

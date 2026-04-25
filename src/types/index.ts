@@ -197,3 +197,10 @@ export type JobSourceLink = {
   isEmployerBoard?: boolean;
   isTrusted?: boolean;
 };
+
+export type CountryRoleSuggestion = {
+  label: string;
+  desiredTitle: string;
+  keyword?: string;
+  href?: string;
+};
