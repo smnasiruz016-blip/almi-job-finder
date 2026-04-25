@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useMemo, useRef, useState } from "react";
 import { Activity, BellRing, Bookmark, BriefcaseBusiness, Building2, ExternalLink, Globe2, Search, Sparkles, Star, UploadCloud } from "lucide-react";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { JobCard } from "@/components/dashboard/job-card";
@@ -262,6 +262,7 @@ export function DashboardShell({
   });
   const alertsEnabledOnPlan = canUseAlerts(user.subscriptionTier);
   const resumeInsightsEnabledOnPlan = canUseResumeInsights(user.subscriptionTier);
+  const resultsSectionRef = useRef<HTMLElement | null>(null);
 
   const availableRegions = useMemo(() => getRegionOptions(formState.country), [formState.country]);
   const availableCities = useMemo(() => getCityOptions(formState.country, formState.state), [formState.country, formState.state]);
@@ -420,6 +421,21 @@ export function DashboardShell({
       state: values.state ?? (values.country && values.country !== current.country ? "" : current.state),
       city: values.city ?? ""
     }));
+  }
+
+  function handleCategoryFilter(category: string) {
+    const nextCategory = selectedCategory === category ? null : category;
+    const nextResults = nextCategory
+      ? sortedResults.filter((job) => (getRoleProfile(job.title)?.category ?? "Other") === nextCategory)
+      : sortedResults;
+
+    setSelectedCategory(nextCategory);
+    setView("cards");
+    setSelectedJob(nextResults[0] ?? null);
+
+    window.requestAnimationFrame(() => {
+      resultsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
 
   async function handleSearch(event: FormEvent<HTMLFormElement>) {
@@ -750,7 +766,7 @@ export function DashboardShell({
                   <button
                     key={entry.category}
                     type="button"
-                    onClick={() => setSelectedCategory((current) => (current === entry.category ? null : entry.category))}
+                    onClick={() => handleCategoryFilter(entry.category)}
                     className={`rounded-[1.25rem] px-4 py-3 text-left transition ${
                       selectedCategory === entry.category
                         ? "bg-teal-50 ring-2 ring-teal-200"
@@ -1244,7 +1260,7 @@ export function DashboardShell({
         </form>
       </section>
 
-      <section className="grid gap-6 2xl:grid-cols-[1.08fr_0.92fr]">
+      <section ref={resultsSectionRef} className="grid gap-6 2xl:grid-cols-[1.08fr_0.92fr]">
         <div className="glass-panel rounded-[2rem] p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
