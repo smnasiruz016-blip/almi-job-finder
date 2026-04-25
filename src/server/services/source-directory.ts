@@ -22,10 +22,11 @@ type JobSourceSeedRow = {
 function uniqueByName(items: JobSourceLink[]) {
   const seen = new Set<string>();
   return items.filter((item) => {
-    if (seen.has(item.name)) {
+    const key = item.name.trim().toLowerCase();
+    if (seen.has(key)) {
       return false;
     }
-    seen.add(item.name);
+    seen.add(key);
     return true;
   });
 }
@@ -59,6 +60,21 @@ function getSeedTrustedSourcesForCountry(country?: string) {
   return uniqueByName([...mapRowsToLinks(countryRows), ...mapRowsToLinks(globalRows)]).slice(0, 6);
 }
 
+function mergeTrustedSources(country: string | undefined, primary: JobSourceLink[], fallback: JobSourceLink[]) {
+  const normalizedCountry = (country ?? "").trim();
+
+  if (!normalizedCountry || normalizedCountry === "Worldwide") {
+    return uniqueByName([...primary, ...fallback]).slice(0, 6);
+  }
+
+  const fallbackLocal = fallback.filter((item) => item.region !== "Worldwide");
+  const fallbackGlobal = fallback.filter((item) => item.region === "Worldwide" || !item.region);
+  const primaryLocal = primary.filter((item) => item.region !== "Worldwide");
+  const primaryGlobal = primary.filter((item) => item.region === "Worldwide" || !item.region);
+
+  return uniqueByName([...fallbackLocal, ...primaryLocal, ...primaryGlobal, ...fallbackGlobal]).slice(0, 6);
+}
+
 export async function isSourceDirectorySchemaReady() {
   try {
     const [table] = await prisma.$queryRawUnsafe<Array<{ exists: boolean }>>(
@@ -80,9 +96,10 @@ export async function isSourceDirectorySchemaReady() {
 
 export async function getTrustedSourcesForCountry(country?: string): Promise<JobSourceLink[]> {
   const schemaReady = await isSourceDirectorySchemaReady();
+  const staticFallback = getStaticTrustedSourcesForCountry(country);
 
   if (!schemaReady) {
-    return getSeedTrustedSourcesForCountry(country);
+    return mergeTrustedSources(country, getSeedTrustedSourcesForCountry(country), staticFallback);
   }
 
   try {
@@ -111,10 +128,11 @@ export async function getTrustedSourcesForCountry(country?: string): Promise<Job
     );
 
     if (rows.length === 0) {
-      return getSeedTrustedSourcesForCountry(country);
+      return mergeTrustedSources(country, getSeedTrustedSourcesForCountry(country), staticFallback);
     }
 
-    return uniqueByName(
+    return mergeTrustedSources(
+      country,
       rows.map((row) => ({
         name: row.website,
         url: row.url,
@@ -126,8 +144,9 @@ export async function getTrustedSourcesForCountry(country?: string): Promise<Job
         isAggregator: row.isAggregator,
         isEmployerBoard: row.isEmployerBoard,
         isTrusted: row.isTrusted
-      }))
-    ).slice(0, 6);
+      })),
+      staticFallback
+    );
   } catch (error) {
     log("warn", "Source directory database lookup failed, using fallback", {
       country,
@@ -135,6 +154,6 @@ export async function getTrustedSourcesForCountry(country?: string): Promise<Job
     });
 
     const seedResults = getSeedTrustedSourcesForCountry(country);
-    return seedResults.length > 0 ? seedResults : getStaticTrustedSourcesForCountry(country);
+    return mergeTrustedSources(country, seedResults, staticFallback);
   }
 }
