@@ -105,6 +105,42 @@ function toPreview(row: FeaturedCompanyRow): HiringCompanyPreview {
   };
 }
 
+function mapVacancyToPreview(vacancy: {
+  id: string;
+  companyId: string;
+  title: string;
+  description: string;
+  status: VacancyStatus;
+  country: string;
+  state: string | null;
+  city: string | null;
+  remoteMode: string | null;
+  employmentType: string | null;
+  salaryMin: number | null;
+  salaryMax: number | null;
+  applyUrl: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    id: vacancy.id,
+    companyId: vacancy.companyId,
+    title: vacancy.title,
+    description: vacancy.description,
+    status: vacancy.status,
+    country: vacancy.country,
+    state: vacancy.state,
+    city: vacancy.city,
+    remoteMode: vacancy.remoteMode,
+    employmentType: vacancy.employmentType,
+    salaryMin: vacancy.salaryMin,
+    salaryMax: vacancy.salaryMax,
+    applyUrl: vacancy.applyUrl,
+    createdAt: vacancy.createdAt.toISOString(),
+    updatedAt: vacancy.updatedAt.toISOString()
+  };
+}
+
 export async function getEmployerInventoryOverview(): Promise<EmployerInventoryOverview> {
   const schemaReady = await isEmployerSchemaReady();
 
@@ -202,16 +238,9 @@ export async function getEmployerWorkspace(userId: string): Promise<EmployerWork
       city: membership.company.city,
       verified: membership.company.verified,
       membershipRole: membership.role,
-      vacancies: membership.company.vacancies.map((vacancy) => ({
-        id: vacancy.id,
-        title: vacancy.title,
-        status: vacancy.status,
-        country: vacancy.country,
-        city: vacancy.city,
-        remoteMode: vacancy.remoteMode,
-        employmentType: vacancy.employmentType,
-        createdAt: vacancy.createdAt.toISOString()
-      }))
+            vacancies: membership.company.vacancies.map((vacancy) => ({
+              ...mapVacancyToPreview(vacancy)
+            }))
     }));
 
     return {
@@ -357,6 +386,79 @@ export async function createVacancyForUser(
 
   await trackProductEvent({
     name: "vacancy_posted",
+    userId,
+    properties: {
+      vacancyId: vacancy.id,
+      companyId: vacancy.companyId,
+      country: vacancy.country,
+      status: vacancy.status
+    }
+  });
+
+  return vacancy;
+}
+
+export async function updateVacancyForUser(
+  userId: string,
+  input: {
+    vacancyId: string;
+    companyId: string;
+    title: string;
+    description: string;
+    country: string;
+    state?: string | null;
+    city?: string | null;
+    remoteMode?: "REMOTE" | "HYBRID" | "ONSITE" | "FLEXIBLE" | null;
+    employmentType?: "FULL_TIME" | "PART_TIME" | "CONTRACT" | "INTERNSHIP" | "TEMPORARY" | null;
+    salaryMin?: number | null;
+    salaryMax?: number | null;
+    applyUrl?: string | null;
+    status?: "DRAFT" | "ACTIVE" | "CLOSED";
+  }
+) {
+  if (!(await isEmployerSchemaReady())) {
+    throw new Error("EMPLOYER_SCHEMA_NOT_READY");
+  }
+
+  const membership = await prisma.companyUser.findFirst({
+    where: {
+      userId,
+      companyId: input.companyId
+    }
+  });
+
+  if (!membership) {
+    throw new Error("COMPANY_ACCESS_DENIED");
+  }
+
+  const existingVacancy = await prisma.vacancy.findUnique({
+    where: { id: input.vacancyId },
+    select: { id: true, companyId: true }
+  });
+
+  if (!existingVacancy || existingVacancy.companyId !== input.companyId) {
+    throw new Error("VACANCY_NOT_FOUND");
+  }
+
+  const vacancy = await prisma.vacancy.update({
+    where: { id: input.vacancyId },
+    data: {
+      title: input.title,
+      description: input.description,
+      country: input.country,
+      state: input.state || null,
+      city: input.city || null,
+      remoteMode: input.remoteMode ?? null,
+      employmentType: input.employmentType ?? null,
+      salaryMin: input.salaryMin ?? null,
+      salaryMax: input.salaryMax ?? null,
+      applyUrl: input.applyUrl || null,
+      status: (input.status as VacancyStatus | undefined) ?? VacancyStatus.DRAFT
+    }
+  });
+
+  await trackProductEvent({
+    name: "vacancy_updated",
     userId,
     properties: {
       vacancyId: vacancy.id,

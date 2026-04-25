@@ -22,7 +22,9 @@ export function EmployerShell({ workspace }: EmployerShellProps) {
   const [localWorkspace, setLocalWorkspace] = useState(workspace);
   const [companyStatus, setCompanyStatus] = useState<InlineStatus>({ type: "idle" });
   const [vacancyStatus, setVacancyStatus] = useState<InlineStatus>({ type: "idle" });
+  const [editingVacancyId, setEditingVacancyId] = useState<string | null>(null);
   const primaryCompany = localWorkspace.companies[0] ?? null;
+  const editingVacancy = primaryCompany?.vacancies.find((vacancy) => vacancy.id === editingVacancyId) ?? null;
 
   const employerSummary = useMemo(() => {
     const companies = localWorkspace.companies.length;
@@ -68,9 +70,12 @@ export function EmployerShell({ workspace }: EmployerShellProps) {
     const formData = new FormData(event.currentTarget);
 
     const response = await fetch("/api/employer/vacancies", {
-      method: "POST",
+      method: editingVacancy ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(Object.fromEntries(formData.entries()))
+      body: JSON.stringify({
+        ...Object.fromEntries(formData.entries()),
+        ...(editingVacancy ? { vacancyId: editingVacancy.id } : {})
+      })
     });
     const data = await response.json();
 
@@ -85,25 +90,102 @@ export function EmployerShell({ workspace }: EmployerShellProps) {
         company.id === data.vacancy.companyId
           ? {
               ...company,
-              vacancies: [
-                {
-                  id: data.vacancy.id,
-                  title: data.vacancy.title,
-                  status: data.vacancy.status,
-                  country: data.vacancy.country,
-                  city: data.vacancy.city,
-                  remoteMode: data.vacancy.remoteMode,
-                  employmentType: data.vacancy.employmentType,
-                  createdAt: data.vacancy.createdAt
-                },
-                ...company.vacancies
-              ]
+              vacancies: editingVacancy
+                ? company.vacancies.map((vacancy) =>
+                    vacancy.id === data.vacancy.id
+                      ? {
+                          ...vacancy,
+                          ...data.vacancy
+                        }
+                      : vacancy
+                  )
+                : [
+                    {
+                      id: data.vacancy.id,
+                      companyId: data.vacancy.companyId,
+                      title: data.vacancy.title,
+                      description: data.vacancy.description,
+                      status: data.vacancy.status,
+                      country: data.vacancy.country,
+                      state: data.vacancy.state,
+                      city: data.vacancy.city,
+                      remoteMode: data.vacancy.remoteMode,
+                      employmentType: data.vacancy.employmentType,
+                      salaryMin: data.vacancy.salaryMin,
+                      salaryMax: data.vacancy.salaryMax,
+                      applyUrl: data.vacancy.applyUrl,
+                      createdAt: data.vacancy.createdAt,
+                      updatedAt: data.vacancy.updatedAt
+                    },
+                    ...company.vacancies
+                  ]
             }
           : company
       )
     }));
-    setVacancyStatus({ type: "success", message: data.message ?? "Vacancy saved." });
+    setVacancyStatus({ type: "success", message: data.message ?? (editingVacancy ? "Vacancy updated." : "Vacancy saved.") });
+    setEditingVacancyId(null);
     event.currentTarget.reset();
+  }
+
+  async function handleQuickStatusChange(vacancyId: string, status: "DRAFT" | "ACTIVE" | "CLOSED") {
+    if (!primaryCompany) {
+      return;
+    }
+
+    const target = primaryCompany.vacancies.find((vacancy) => vacancy.id === vacancyId);
+    if (!target) {
+      return;
+    }
+
+    setVacancyStatus({ type: "idle" });
+
+    const response = await fetch("/api/employer/vacancies", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        vacancyId: target.id,
+        companyId: target.companyId,
+        title: target.title,
+        description: target.description,
+        country: target.country,
+        state: target.state ?? "",
+        city: target.city ?? "",
+        remoteMode: target.remoteMode ?? "",
+        employmentType: target.employmentType ?? "",
+        salaryMin: target.salaryMin ?? "",
+        salaryMax: target.salaryMax ?? "",
+        applyUrl: target.applyUrl ?? "",
+        status
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      setVacancyStatus({ type: "error", message: data.error ?? "We could not update that vacancy right now." });
+      return;
+    }
+
+    setLocalWorkspace((current) => ({
+      ...current,
+      companies: current.companies.map((company) =>
+        company.id === data.vacancy.companyId
+          ? {
+              ...company,
+              vacancies: company.vacancies.map((vacancy) =>
+                vacancy.id === data.vacancy.id
+                  ? {
+                      ...vacancy,
+                      ...data.vacancy
+                    }
+                  : vacancy
+              )
+            }
+          : company
+      )
+    }));
+    setVacancyStatus({ type: "success", message: data.message ?? "Vacancy updated." });
   }
 
   return (
@@ -214,36 +296,41 @@ export function EmployerShell({ workspace }: EmployerShellProps) {
                 <BriefcaseBusiness className="h-5 w-5" />
               </div>
               <div>
-                <p className="font-semibold text-slate-900">Post a vacancy</p>
-                <p className="text-sm text-slate-500">Create a direct employer role that can become part of Almiworld&apos;s owned inventory. Active vacancies appear in search, while drafts stay private.</p>
+                <p className="font-semibold text-slate-900">{editingVacancy ? "Edit vacancy" : "Post a vacancy"}</p>
+                <p className="text-sm text-slate-500">
+                  {editingVacancy
+                    ? "Update the role details and control whether it stays active, returns to draft, or closes cleanly."
+                    : "Create a direct employer role that can become part of Almiworld&apos;s owned inventory. Active vacancies appear in search, while drafts stay private."}
+                </p>
               </div>
             </div>
 
             <input type="hidden" name="companyId" value={primaryCompany.id} />
 
             <div className="mt-5 grid gap-4 md:grid-cols-2">
-              <Input name="title" placeholder="Job title" required />
-              <Select name="status" defaultValue="ACTIVE">
+              <Input name="title" placeholder="Job title" required defaultValue={editingVacancy?.title ?? ""} />
+              <Select name="status" defaultValue={editingVacancy?.status ?? "ACTIVE"}>
                 <option value="DRAFT">Draft</option>
                 <option value="ACTIVE">Active</option>
                 <option value="CLOSED">Closed</option>
               </Select>
-              <Select name="country" defaultValue={primaryCompany.country}>
+              <Select name="country" defaultValue={editingVacancy?.country ?? primaryCompany.country}>
                 {COUNTRY_OPTIONS.filter((country) => country !== "Worldwide").map((country) => (
                   <option key={country} value={country}>
                     {country}
                   </option>
                 ))}
               </Select>
-              <Input name="city" placeholder="City (optional)" defaultValue={primaryCompany.city ?? ""} />
-              <Select name="remoteMode" defaultValue="">
+              <Input name="state" placeholder="State / region (optional)" defaultValue={editingVacancy?.state ?? ""} />
+              <Input name="city" placeholder="City (optional)" defaultValue={editingVacancy?.city ?? primaryCompany.city ?? ""} />
+              <Select name="remoteMode" defaultValue={editingVacancy?.remoteMode ?? ""}>
                 <option value="">Remote preference</option>
                 <option value="REMOTE">Remote</option>
                 <option value="HYBRID">Hybrid</option>
                 <option value="ONSITE">Onsite</option>
                 <option value="FLEXIBLE">Flexible</option>
               </Select>
-              <Select name="employmentType" defaultValue="">
+              <Select name="employmentType" defaultValue={editingVacancy?.employmentType ?? ""}>
                 <option value="">Employment type</option>
                 <option value="FULL_TIME">Full time</option>
                 <option value="PART_TIME">Part time</option>
@@ -251,10 +338,17 @@ export function EmployerShell({ workspace }: EmployerShellProps) {
                 <option value="INTERNSHIP">Internship</option>
                 <option value="TEMPORARY">Temporary</option>
               </Select>
-              <Input name="salaryMin" placeholder="Salary min (optional)" />
-              <Input name="salaryMax" placeholder="Salary max (optional)" />
-              <Input name="applyUrl" placeholder="Apply URL (optional)" className="md:col-span-2" />
-              <Textarea name="description" placeholder="Describe the vacancy, responsibilities, and key requirements." rows={8} className="md:col-span-2" required />
+              <Input name="salaryMin" placeholder="Salary min (optional)" defaultValue={editingVacancy?.salaryMin ?? ""} />
+              <Input name="salaryMax" placeholder="Salary max (optional)" defaultValue={editingVacancy?.salaryMax ?? ""} />
+              <Input name="applyUrl" placeholder="Apply URL (optional)" className="md:col-span-2" defaultValue={editingVacancy?.applyUrl ?? ""} />
+              <Textarea
+                name="description"
+                placeholder="Describe the vacancy, responsibilities, and key requirements."
+                rows={8}
+                className="md:col-span-2"
+                required
+                defaultValue={editingVacancy?.description ?? ""}
+              />
             </div>
 
             {vacancyStatus.type !== "idle" ? (
@@ -264,12 +358,25 @@ export function EmployerShell({ workspace }: EmployerShellProps) {
             ) : null}
 
             <div className="mt-4 rounded-[1.25rem] bg-teal-50 px-4 py-3 text-sm text-teal-900">
-              New vacancies default to <span className="font-semibold">Active</span> so they can appear in search right away.
+              {editingVacancy ? (
+                <>
+                  You are editing a live employer role. Save it as <span className="font-semibold">Active</span> to keep it visible, or move it to Draft / Closed as needed.
+                </>
+              ) : (
+                <>
+                  New vacancies default to <span className="font-semibold">Active</span> so they can appear in search right away.
+                </>
+              )}
             </div>
 
-            <Button type="submit" className="mt-5">
-              Post vacancy
-            </Button>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Button type="submit">{editingVacancy ? "Update vacancy" : "Post vacancy"}</Button>
+              {editingVacancy ? (
+                <Button type="button" variant="secondary" onClick={() => setEditingVacancyId(null)}>
+                  Cancel edit
+                </Button>
+              ) : null}
+            </div>
           </form>
 
           <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
@@ -305,9 +412,29 @@ export function EmployerShell({ workspace }: EmployerShellProps) {
                         </span>
                       ) : null}
                     </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button type="button" variant="secondary" onClick={() => setEditingVacancyId(vacancy.id)}>
+                        Edit vacancy
+                      </Button>
+                      {vacancy.status !== "ACTIVE" ? (
+                        <Button type="button" variant="secondary" onClick={() => void handleQuickStatusChange(vacancy.id, "ACTIVE")}>
+                          Make active
+                        </Button>
+                      ) : null}
+                      {vacancy.status !== "DRAFT" ? (
+                        <Button type="button" variant="secondary" onClick={() => void handleQuickStatusChange(vacancy.id, "DRAFT")}>
+                          Save as draft
+                        </Button>
+                      ) : null}
+                      {vacancy.status !== "CLOSED" ? (
+                        <Button type="button" variant="secondary" onClick={() => void handleQuickStatusChange(vacancy.id, "CLOSED")}>
+                          Close role
+                        </Button>
+                      ) : null}
+                    </div>
                     {vacancy.status !== "ACTIVE" ? (
                       <p className="mt-3 text-xs leading-6 text-amber-700">
-                        This vacancy is not live in search yet. Switch it to Active when edit controls are added, or repost it as Active now.
+                        This vacancy is not live in search yet. Switch it to Active whenever you want it discoverable.
                       </p>
                     ) : (
                       <p className="mt-3 text-xs leading-6 text-emerald-700">

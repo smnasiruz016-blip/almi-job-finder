@@ -91,7 +91,7 @@ export const companyCreateSchema = z.object({
   description: z.string().trim().max(1000).optional().or(z.literal(""))
 });
 
-export const vacancyCreateSchema = z.object({
+const vacancyBaseSchema = z.object({
   companyId: z.string().trim().min(1),
   title: z.string().trim().min(2).max(140),
   description: z.string().trim().min(20).max(5000),
@@ -104,6 +104,15 @@ export const vacancyCreateSchema = z.object({
   salaryMax: z.preprocess((value) => (value === "" ? undefined : value), z.coerce.number().int().min(0).optional()),
   applyUrl: z.string().trim().url().optional().or(z.literal("")),
   status: z.enum(["DRAFT", "ACTIVE", "CLOSED"]).default("DRAFT")
+});
+
+export const vacancyCreateSchema = vacancyBaseSchema.refine((data) => !data.salaryMin || !data.salaryMax || data.salaryMax >= data.salaryMin, {
+  message: "Salary max must be greater than or equal to salary min.",
+  path: ["salaryMax"]
+});
+
+export const vacancyUpdateSchema = vacancyBaseSchema.extend({
+  vacancyId: z.string().trim().min(1)
 }).refine((data) => !data.salaryMin || !data.salaryMax || data.salaryMax >= data.salaryMin, {
   message: "Salary max must be greater than or equal to salary min.",
   path: ["salaryMax"]

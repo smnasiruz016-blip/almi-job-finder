@@ -120,13 +120,20 @@ export type EmployerInventoryOverview = {
 
 export type EmployerVacancyPreview = {
   id: string;
+  companyId: string;
   title: string;
+  description: string;
   status: string;
   country: string;
+  state?: string | null;
   city?: string | null;
   remoteMode?: string | null;
   employmentType?: string | null;
+  salaryMin?: number | null;
+  salaryMax?: number | null;
+  applyUrl?: string | null;
   createdAt: string;
+  updatedAt: string;
 };
 
 export type EmployerCompanyWorkspace = {

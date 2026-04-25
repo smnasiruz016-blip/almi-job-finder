@@ -8,7 +8,8 @@ export type ProductEventName =
   | "alert_toggled"
   | "plan_limit_hit"
   | "company_created"
-  | "vacancy_posted";
+  | "vacancy_posted"
+  | "vacancy_updated";
 
 export type ProductEvent = {
   name: ProductEventName;

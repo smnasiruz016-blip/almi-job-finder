@@ -12,7 +12,9 @@ const prisma = {
   },
   vacancy: {
     create: vi.fn(),
-    findMany: vi.fn()
+    findMany: vi.fn(),
+    findUnique: vi.fn(),
+    update: vi.fn()
   }
 };
 
@@ -143,6 +145,54 @@ describe("getEmployerInventoryOverview", () => {
         sourceType: "live",
         location: "Reykjavik, Iceland",
         applyUrl: "https://clinic.example/jobs/staff-nurse"
+      })
+    );
+  });
+
+  it("updates a vacancy when the user belongs to the company", async () => {
+    prisma.$queryRawUnsafe
+      .mockResolvedValueOnce([{ exists: true }])
+      .mockResolvedValueOnce([{ exists: true }]);
+    prisma.companyUser.findFirst.mockResolvedValue({ id: "membership_1" });
+    prisma.vacancy.findUnique.mockResolvedValue({ id: "vacancy_1", companyId: "company_1" });
+    prisma.vacancy.update.mockResolvedValue({
+      id: "vacancy_1",
+      companyId: "company_1",
+      title: "Staff Nurse",
+      description: "Updated vacancy description for a clinical ward role.",
+      country: "Iceland",
+      state: null,
+      city: "Reykjavik",
+      remoteMode: null,
+      employmentType: "FULL_TIME",
+      salaryMin: 5000,
+      salaryMax: 7000,
+      applyUrl: "https://clinic.example/jobs/staff-nurse",
+      status: "ACTIVE",
+      createdAt: new Date("2026-04-25T00:00:00.000Z"),
+      updatedAt: new Date("2026-04-25T01:00:00.000Z")
+    });
+
+    const { updateVacancyForUser } = await import("@/server/services/company-vacancies");
+    const vacancy = await updateVacancyForUser("user_1", {
+      vacancyId: "vacancy_1",
+      companyId: "company_1",
+      title: "Staff Nurse",
+      description: "Updated vacancy description for a clinical ward role.",
+      country: "Iceland",
+      city: "Reykjavik",
+      status: "ACTIVE"
+    });
+
+    expect(prisma.vacancy.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "vacancy_1" }
+      })
+    );
+    expect(vacancy.status).toBe("ACTIVE");
+    expect(trackProductEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "vacancy_updated"
       })
     );
   });

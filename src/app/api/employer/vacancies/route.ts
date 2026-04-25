@@ -1,8 +1,8 @@
 import { getRequiredUser } from "@/lib/auth";
 import { jsonError } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
-import { vacancyCreateSchema } from "@/lib/validation";
-import { createVacancyForUser } from "@/server/services/company-vacancies";
+import { vacancyCreateSchema, vacancyUpdateSchema } from "@/lib/validation";
+import { createVacancyForUser, updateVacancyForUser } from "@/server/services/company-vacancies";
 
 async function findRecoveredVacancy(
   userId: string,
@@ -110,5 +110,68 @@ export async function POST(request: Request) {
     }
 
     return jsonError("We could not save that vacancy right now.", 500);
+  }
+}
+
+export async function PATCH(request: Request) {
+  let user;
+
+  try {
+    user = await getRequiredUser();
+  } catch {
+    return jsonError("Unauthorized.", 401);
+  }
+
+  const body = await request.json();
+  const parsed = vacancyUpdateSchema.safeParse(body);
+
+  if (!parsed.success) {
+    return jsonError(parsed.error.issues[0]?.message ?? "Invalid vacancy payload.");
+  }
+
+  const vacancyInput = {
+    vacancyId: parsed.data.vacancyId,
+    companyId: parsed.data.companyId,
+    title: parsed.data.title,
+    description: parsed.data.description,
+    country: parsed.data.country,
+    state: parsed.data.state || null,
+    city: parsed.data.city || null,
+    remoteMode: parsed.data.remoteMode ?? null,
+    employmentType: parsed.data.employmentType ?? null,
+    salaryMin: parsed.data.salaryMin ?? null,
+    salaryMax: parsed.data.salaryMax ?? null,
+    applyUrl: parsed.data.applyUrl || null,
+    status: parsed.data.status
+  };
+
+  try {
+    const vacancy = await updateVacancyForUser(user.id, vacancyInput);
+
+    return Response.json({
+      vacancy,
+      message:
+        vacancy.status === "ACTIVE"
+          ? "Vacancy updated and live in search."
+          : vacancy.status === "CLOSED"
+            ? "Vacancy closed."
+            : "Vacancy saved as draft."
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === "EMPLOYER_SCHEMA_NOT_READY") {
+        return jsonError("Employer posting is being activated right now. Try again shortly.", 503);
+      }
+
+      if (error.message === "COMPANY_ACCESS_DENIED") {
+        return jsonError("You do not have access to edit vacancies for that company.", 403);
+      }
+
+      if (error.message === "VACANCY_NOT_FOUND") {
+        return jsonError("We could not find that vacancy.", 404);
+      }
+    }
+
+    return jsonError("We could not update that vacancy right now.", 500);
   }
 }
