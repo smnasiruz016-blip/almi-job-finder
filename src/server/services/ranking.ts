@@ -1,5 +1,6 @@
 import type { JobSearchInput, NormalizedJob, ParsedResume, RankedJob } from "@/types";
 import { isWorldwideFilter } from "@/lib/location";
+import { getCountryProviderWeight } from "@/lib/country-provider-weighting";
 import { matchesSearchQuery } from "@/lib/search-query";
 import { dedupe } from "@/lib/utils";
 
@@ -106,6 +107,19 @@ export function rankJobs(
       if (search.company && job.company.toLowerCase().includes(search.company.toLowerCase())) {
         score += 8;
         reasons.push(`Company preference matched: ${search.company}`);
+      }
+
+      const providerWeight = getCountryProviderWeight(search, job);
+      if (providerWeight !== 0) {
+        score += providerWeight;
+
+        if (providerWeight >= 12) {
+          reasons.push(`Source is strong for ${search.country ?? "this search"}`);
+        } else if (providerWeight >= 6) {
+          reasons.push("Source is a reasonable fit for this market");
+        } else if (providerWeight <= -6) {
+          reasons.push("Source looks less local for this search");
+        }
       }
 
       const skillMatches = uniqueMatches(resumeSkills, jobKeywords);
