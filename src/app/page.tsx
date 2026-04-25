@@ -1,7 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, BarChart3, BriefcaseBusiness, CheckCircle2, Home, SearchCode, UploadCloud } from "lucide-react";
+import { CountryHiringPanel } from "@/components/dashboard/country-hiring-panel";
 import { getCurrentUser } from "@/lib/auth";
+import { getCountryHiringHighlights } from "@/server/services/company-vacancies";
+import { getDetectedCountry } from "@/server/services/country-detection";
+import { getTrustedSourcesForCountry } from "@/server/services/source-directory";
 
 const steps = [
   {
@@ -46,6 +50,11 @@ const productSignals = [
 
 export default async function HomePage() {
   const user = await getCurrentUser();
+  const detectedCountry = await getDetectedCountry();
+  const [countryHighlights, trustedCountrySources] = await Promise.all([
+    getCountryHiringHighlights(detectedCountry),
+    getTrustedSourcesForCountry(detectedCountry)
+  ]);
   const primaryHref = user ? "/dashboard" : "/signup";
   const uploadHref = user ? "/dashboard#search" : "/signup";
 
@@ -192,6 +201,15 @@ export default async function HomePage() {
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="page-shell pt-6">
+        <CountryHiringPanel
+          title={`Browse jobs in ${detectedCountry}`}
+          description="Visitors should be able to see local hiring signals even before they upload a resume or run a narrow search."
+          highlights={countryHighlights}
+          trustedSources={trustedCountrySources}
+        />
       </section>
 
       <section className="page-shell pt-2">

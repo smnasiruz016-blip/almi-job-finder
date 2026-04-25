@@ -118,6 +118,31 @@ export type EmployerInventoryOverview = {
   source: "database" | "fallback" | "unavailable";
 };
 
+export type PublicHiringVacancy = {
+  id: string;
+  title: string;
+  company: string;
+  companySlug: string;
+  country: string;
+  state?: string | null;
+  city?: string | null;
+  location: string;
+  employmentType?: string | null;
+  remoteMode?: string | null;
+  applyUrl: string;
+  postedAt: string;
+  verifiedCompany: boolean;
+};
+
+export type CountryHiringHighlights = {
+  country: string;
+  vacancies: PublicHiringVacancy[];
+  companies: HiringCompanyPreview[];
+  totalVacancies: number;
+  totalCompanies: number;
+  source: "database" | "fallback" | "unavailable";
+};
+
 export type EmployerVacancyPreview = {
   id: string;
   companyId: string;

@@ -5,6 +5,7 @@ import { trackProductEvent } from "@/lib/analytics";
 import { log } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import type {
+  CountryHiringHighlights,
   EmployerCompanyWorkspace,
   EmployerInventoryOverview,
   EmployerWorkspace,
@@ -24,6 +25,15 @@ const FALLBACK_WORKSPACE: EmployerWorkspace = {
   ready: false,
   canCreateCompany: false,
   companies: [],
+  source: "fallback"
+};
+
+const FALLBACK_COUNTRY_HIRING: CountryHiringHighlights = {
+  country: "Worldwide",
+  vacancies: [],
+  companies: [],
+  totalVacancies: 0,
+  totalCompanies: 0,
   source: "fallback"
 };
 
@@ -138,6 +148,40 @@ function mapVacancyToPreview(vacancy: {
     applyUrl: vacancy.applyUrl,
     createdAt: vacancy.createdAt.toISOString(),
     updatedAt: vacancy.updatedAt.toISOString()
+  };
+}
+
+function mapVacancyToPublicPreview(vacancy: {
+  id: string;
+  title: string;
+  country: string;
+  state?: string | null;
+  city?: string | null;
+  employmentType?: string | null;
+  remoteMode?: string | null;
+  applyUrl?: string | null;
+  createdAt: Date;
+  company: {
+    name: string;
+    slug: string;
+    website?: string | null;
+    verified: boolean;
+  };
+}) {
+  return {
+    id: vacancy.id,
+    title: vacancy.title,
+    company: vacancy.company.name,
+    companySlug: vacancy.company.slug,
+    country: vacancy.country,
+    state: vacancy.state,
+    city: vacancy.city,
+    location: buildVacancyLocation(vacancy),
+    employmentType: vacancy.employmentType,
+    remoteMode: vacancy.remoteMode,
+    applyUrl: vacancy.applyUrl || vacancy.company.website || "https://www.almiworld.com",
+    postedAt: vacancy.createdAt.toISOString(),
+    verifiedCompany: vacancy.company.verified
   };
 }
 
@@ -380,7 +424,7 @@ export async function createVacancyForUser(
       salaryMin: input.salaryMin ?? null,
       salaryMax: input.salaryMax ?? null,
       applyUrl: input.applyUrl || null,
-      status: (input.status as VacancyStatus | undefined) ?? VacancyStatus.DRAFT
+      status: (input.status as VacancyStatus | undefined) ?? VacancyStatus.ACTIVE
     }
   });
 
@@ -453,7 +497,7 @@ export async function updateVacancyForUser(
       salaryMin: input.salaryMin ?? null,
       salaryMax: input.salaryMax ?? null,
       applyUrl: input.applyUrl || null,
-      status: (input.status as VacancyStatus | undefined) ?? VacancyStatus.DRAFT
+      status: (input.status as VacancyStatus | undefined) ?? VacancyStatus.ACTIVE
     }
   });
 
@@ -609,5 +653,82 @@ export async function searchEmployerVacancies(input: JobSearchInput): Promise<No
       error: error instanceof Error ? error.message : "Unknown error"
     });
     return [];
+  }
+}
+
+export async function getCountryHiringHighlights(country?: string, limit = 4): Promise<CountryHiringHighlights> {
+  const targetCountry = (country ?? "").trim() || "Worldwide";
+
+  if (!(await isEmployerSchemaReady())) {
+    return {
+      ...FALLBACK_COUNTRY_HIRING,
+      country: targetCountry
+    };
+  }
+
+  try {
+    const baseWhere =
+      targetCountry === "Worldwide"
+        ? {
+            status: VacancyStatus.ACTIVE
+          }
+        : {
+            status: VacancyStatus.ACTIVE,
+            country: targetCountry
+          };
+
+    const vacancies = await prisma.vacancy.findMany({
+      where: baseWhere,
+      include: {
+        company: true
+      },
+      orderBy: {
+        createdAt: "desc"
+      },
+      take: Math.max(limit, 1) * 3
+    });
+
+    const visibleVacancies = vacancies.slice(0, limit);
+    const companyMap = new Map<string, HiringCompanyPreview>();
+
+    for (const vacancy of vacancies) {
+      const openRolesForCompany = vacancies.filter(
+        (candidate) => candidate.companyId === vacancy.companyId && candidate.status === VacancyStatus.ACTIVE
+      );
+
+      if (!companyMap.has(vacancy.companyId)) {
+        companyMap.set(vacancy.companyId, {
+          id: vacancy.company.id,
+          name: vacancy.company.name,
+          slug: vacancy.company.slug,
+          website: vacancy.company.website,
+          country: vacancy.company.country,
+          city: vacancy.company.city,
+          verified: vacancy.company.verified,
+          openRoles: openRolesForCompany.length,
+          roleTitles: openRolesForCompany.map((candidate) => candidate.title).filter(Boolean).slice(0, 3)
+        });
+      }
+    }
+
+    return {
+      country: targetCountry,
+      vacancies: visibleVacancies.map(mapVacancyToPublicPreview),
+      companies: Array.from(companyMap.values()).slice(0, limit),
+      totalVacancies: vacancies.length,
+      totalCompanies: companyMap.size,
+      source: "database"
+    };
+  } catch (error) {
+    log("warn", "Country hiring highlights fallback activated", {
+      country: targetCountry,
+      error: error instanceof Error ? error.message : "Unknown error"
+    });
+
+    return {
+      ...FALLBACK_COUNTRY_HIRING,
+      country: targetCountry,
+      source: "unavailable"
+    };
   }
 }

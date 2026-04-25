@@ -1,30 +1,14 @@
-import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { COUNTRY_OPTIONS } from "@/lib/location-data";
 import { log } from "@/lib/logger";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { getLatestParsedResume } from "@/server/services/resume-service";
-import { getEmployerInventoryOverview } from "@/server/services/company-vacancies";
+import { getCountryHiringHighlights, getEmployerInventoryOverview } from "@/server/services/company-vacancies";
+import { getDetectedCountry } from "@/server/services/country-detection";
 import { executeJobSearch } from "@/server/services/job-search";
+import { getTrustedSourcesForCountry } from "@/server/services/source-directory";
 import { getSearchUsageForUser } from "@/server/services/usage";
 import type { RankedJob } from "@/types";
-
-async function getDetectedCountry() {
-  const requestHeaders = await headers();
-  const countryCode = requestHeaders.get("x-vercel-ip-country")?.trim().toUpperCase();
-
-  if (!countryCode) {
-    return "Worldwide";
-  }
-
-  try {
-    const displayName = new Intl.DisplayNames(["en"], { type: "region" }).of(countryCode);
-    return displayName && COUNTRY_OPTIONS.includes(displayName) ? displayName : "Worldwide";
-  } catch {
-    return "Worldwide";
-  }
-}
 
 export default async function DashboardPage() {
   const user = await requireUser();
@@ -34,11 +18,13 @@ export default async function DashboardPage() {
   let savedSearches: Awaited<ReturnType<typeof prisma.savedSearch.findMany>> = [];
   let history: Awaited<ReturnType<typeof prisma.jobSearch.findMany>> = [];
   let employerInventory = await getEmployerInventoryOverview();
+  let countryHighlights = await getCountryHiringHighlights(detectedCountry);
+  let trustedCountrySources = await getTrustedSourcesForCountry(detectedCountry);
   let initialResults: RankedJob[] = [];
   const usage = await getSearchUsageForUser(user.id);
 
   try {
-    [resume, savedJobs, savedSearches, history, employerInventory] = await Promise.all([
+    [resume, savedJobs, savedSearches, history, employerInventory, countryHighlights, trustedCountrySources] = await Promise.all([
       getLatestParsedResume(user.id),
       prisma.savedJob.findMany({
         where: { userId: user.id },
@@ -55,7 +41,9 @@ export default async function DashboardPage() {
         orderBy: { createdAt: "desc" },
         take: 5
       }),
-      getEmployerInventoryOverview()
+      getEmployerInventoryOverview(),
+      getCountryHiringHighlights(detectedCountry),
+      getTrustedSourcesForCountry(detectedCountry)
     ]);
 
     try {
@@ -98,7 +86,10 @@ export default async function DashboardPage() {
       user={user}
       resume={resume}
       usage={usage}
+      detectedCountry={detectedCountry}
       employerInventory={employerInventory}
+      countryHighlights={countryHighlights}
+      trustedCountrySources={trustedCountrySources}
       initialResults={initialResults}
       initialSavedJobs={savedJobs}
       initialSavedSearches={savedSearches.map((search) => ({

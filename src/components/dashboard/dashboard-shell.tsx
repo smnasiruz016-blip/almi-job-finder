@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Activity, BellRing, Bookmark, BriefcaseBusiness, Building2, ExternalLink, Globe2, Search, Sparkles, Star, UploadCloud } from "lucide-react";
 import { EmptyState } from "@/components/dashboard/empty-state";
+import { CountryHiringPanel } from "@/components/dashboard/country-hiring-panel";
 import { JobCard } from "@/components/dashboard/job-card";
 import { MatchScore } from "@/components/dashboard/match-score";
 import { PlanCard } from "@/components/dashboard/plan-card";
@@ -22,7 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrencyRange } from "@/lib/utils";
-import type { EmployerInventoryOverview, JobSourceLink, ParsedResume, ProviderStatus, RankedJob, SearchInsights, SearchUsageSnapshot, SessionUser } from "@/types";
+import type { CountryHiringHighlights, EmployerInventoryOverview, JobSourceLink, ParsedResume, ProviderStatus, RankedJob, SearchInsights, SearchUsageSnapshot, SessionUser } from "@/types";
 
 type HistorySnapshot = {
   desiredTitle: string;
@@ -42,7 +43,10 @@ type DashboardShellProps = {
   user: SessionUser;
   resume: ParsedResume | null;
   usage: SearchUsageSnapshot;
+  detectedCountry: string;
   employerInventory: EmployerInventoryOverview;
+  countryHighlights: CountryHiringHighlights;
+  trustedCountrySources: JobSourceLink[];
   initialResults: RankedJob[];
   initialSavedJobs: Array<{
     id: string;
@@ -245,7 +249,10 @@ export function DashboardShell({
   user,
   resume,
   usage,
+  detectedCountry,
   employerInventory,
+  countryHighlights,
+  trustedCountrySources,
   initialResults,
   initialSavedJobs,
   initialSavedSearches,
@@ -967,6 +974,14 @@ export function DashboardShell({
 
         <div className="space-y-6">
           <PlanCard usage={searchUsage} />
+
+          <CountryHiringPanel
+            title={`Jobs visitors can browse in ${detectedCountry}`}
+            description="This gives visitors and signed-in users a cleaner country entry point before they narrow into a specific role search."
+            highlights={countryHighlights}
+            trustedSources={trustedCountrySources}
+            compact
+          />
 
           <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-start gap-3">
