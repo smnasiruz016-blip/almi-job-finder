@@ -219,7 +219,7 @@ export default async function HomePage() {
           <div className="flex flex-wrap gap-3">
             <Link
               href={primaryHref}
-              className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 font-medium text-slate-950 transition hover:bg-slate-100"
+              className="inline-flex items-center gap-2 rounded-full bg-teal-300 px-5 py-3 font-semibold !text-slate-950 shadow-[0_12px_30px_rgba(45,212,191,0.28)] transition hover:bg-teal-200"
             >
               Start Free
               <ArrowRight className="h-4 w-4" />
