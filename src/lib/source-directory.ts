@@ -5,19 +5,31 @@ const GLOBAL_SOURCES: JobSourceLink[] = [
     name: "LinkedIn Jobs",
     url: "https://www.linkedin.com/jobs/",
     category: "professional",
-    note: "Good for professional roles and international employers."
+    note: "Good for professional roles and international employers.",
+    region: "Worldwide",
+    sourcePriority: 10,
+    isTrusted: true
   },
   {
     name: "Jooble",
     url: "https://jooble.org/",
     category: "aggregator",
-    note: "Broad worldwide search coverage across many countries."
+    note: "Broad worldwide search coverage across many countries.",
+    region: "Worldwide",
+    sourcePriority: 20,
+    hasApi: true,
+    isAggregator: true,
+    isTrusted: true
   },
   {
     name: "Indeed",
     url: "https://www.indeed.com/",
     category: "aggregator",
-    note: "Strong general job coverage and useful for broader searches."
+    note: "Strong general job coverage and useful for broader searches.",
+    region: "Worldwide",
+    sourcePriority: 30,
+    isAggregator: true,
+    isTrusted: true
   }
 ];
 

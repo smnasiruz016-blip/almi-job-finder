@@ -35,7 +35,13 @@ function mapRowsToLinks(rows: JobSourceSeedRow[]) {
     name: row.website,
     url: row.url,
     category: row.category,
-    note: row.notes
+    note: row.notes,
+    region: row.region,
+    sourcePriority: row.sourcePriority,
+    hasApi: row.hasApi,
+    isAggregator: row.isAggregator,
+    isEmployerBoard: row.isEmployerBoard,
+    isTrusted: row.isTrusted
   }));
 }
 
@@ -113,7 +119,13 @@ export async function getTrustedSourcesForCountry(country?: string): Promise<Job
         name: row.website,
         url: row.url,
         category: row.category,
-        note: row.notes ?? "Trusted job source for this market."
+        note: row.notes ?? "Trusted job source for this market.",
+        region: row.region,
+        sourcePriority: row.sourcePriority,
+        hasApi: row.hasApi,
+        isAggregator: row.isAggregator,
+        isEmployerBoard: row.isEmployerBoard,
+        isTrusted: row.isTrusted
       }))
     ).slice(0, 6);
   } catch (error) {

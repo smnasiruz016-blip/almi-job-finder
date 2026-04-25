@@ -12,6 +12,7 @@ import { buildAlertOverview, buildSetupChecklist } from "@/lib/dashboard-insight
 import { collectAdvertisedSkills, getRoleProfile, getRoleSuggestions, getSuggestedSkillOptions, ROLE_OPTIONS } from "@/lib/job-taxonomy";
 import { buildProfileInsights } from "@/lib/profile-insights";
 import { buildResumeSuggestions } from "@/lib/resume-suggestions";
+import { shouldShowTrustedSourcePanel } from "@/lib/source-guidance";
 import { buildResultsSummary, buildUsageSupportCopy } from "@/lib/search-trust";
 import { COUNTRY_OPTIONS, getCityOptions, getRegionOptions } from "@/lib/location-data";
 import { getTrustedSourcesForCountry } from "@/lib/source-directory";
@@ -204,6 +205,24 @@ function getProviderLabel(status: ProviderStatus["status"]) {
   return "Standby";
 }
 
+function getSourceBadges(source: JobSourceLink) {
+  const badges = [source.category];
+
+  if (source.hasApi) {
+    badges.push("API");
+  }
+
+  if (source.isEmployerBoard) {
+    badges.push("Employer board");
+  } else if (source.isAggregator) {
+    badges.push("Aggregator");
+  } else if (source.isTrusted) {
+    badges.push("Trusted");
+  }
+
+  return badges.slice(0, 3);
+}
+
 function getAlertFrequencyLabel(frequency: string) {
   return frequency === "WEEKLY" ? "Weekly" : "Daily";
 }
@@ -389,9 +408,20 @@ export function DashboardShell({
     );
   }, [filteredResults, selectedJob]);
   const resumeSuggestions = useMemo(() => buildResumeSuggestions(resumeSnapshot, visibleSelectedJob), [resumeSnapshot, visibleSelectedJob]);
+  const showTrustedSourcePanel = useMemo(
+    () =>
+      shouldShowTrustedSourcePanel({
+        country: formState.country,
+        resultsCount: filteredResults.length,
+        averageMatchScore: searchMeta?.quality?.averageMatchScore,
+        providerStatuses: searchMeta?.providerStatuses,
+        selectedCategory
+      }),
+    [filteredResults.length, formState.country, searchMeta?.providerStatuses, searchMeta?.quality?.averageMatchScore, selectedCategory]
+  );
 
   useEffect(() => {
-    if (sortedResults.length > 0) {
+    if (!showTrustedSourcePanel) {
       return;
     }
 
@@ -421,7 +451,65 @@ export function DashboardShell({
     return () => {
       cancelled = true;
     };
-  }, [formState.country, sortedResults.length]);
+  }, [formState.country, showTrustedSourcePanel]);
+
+  const trustedSourcePanel =
+    showTrustedSourcePanel && trustedSources.length > 0 ? (
+      <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="rounded-2xl bg-teal-50 p-3 text-teal-700">
+            <Globe2 className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-slate-900">
+              {filteredResults.length === 0
+                ? `Trusted job websites for ${formState.country === "Worldwide" ? "worldwide search" : formState.country}`
+                : `Expand this search with trusted job websites in ${formState.country === "Worldwide" ? "global markets" : formState.country}`}
+            </h3>
+            <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-600">
+              {filteredResults.length === 0
+                ? "Live provider coverage is still thin for this search. These trusted external job websites are a good next step while we keep expanding worldwide provider coverage."
+                : "You have some live results, but this search still looks thin or low-confidence. These trusted job sites are a good next step for deeper local coverage."}
+            </p>
+          </div>
+        </div>
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {trustedSources.map((source) => (
+            <a
+              key={`${formState.country}-${source.name}`}
+              href={source.url}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4 transition hover:-translate-y-0.5 hover:border-teal-200 hover:bg-white hover:shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-slate-900">{source.name}</p>
+                  {source.region && source.region !== "Worldwide" && (
+                    <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-400">{source.region}</p>
+                  )}
+                </div>
+                <div className="flex flex-wrap justify-end gap-2">
+                  {getSourceBadges(source).map((badge) => (
+                    <span
+                      key={`${source.name}-${badge}`}
+                      className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 ring-1 ring-slate-200"
+                    >
+                      {badge}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-600">{source.note}</p>
+              <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-teal-700">
+                Open source
+                <ExternalLink className="h-4 w-4" />
+              </div>
+            </a>
+          ))}
+        </div>
+      </div>
+    ) : null;
 
   function updateForm<K extends keyof SearchFormState>(key: K, value: SearchFormState[K]) {
     setFormState((current) => ({ ...current, [key]: value }));
@@ -1484,6 +1572,7 @@ export function DashboardShell({
                 )}
               </div>
             )}
+            {trustedSourcePanel}
             {searchStatus.type === "loading" ? (
               <ResultSkeleton />
             ) : filteredResults.length === 0 ? (
@@ -1499,46 +1588,6 @@ export function DashboardShell({
                   details={selectedCategory ? ["Use Clear filter to return to the full result set.", "Try a broader role title if you want more category coverage."] : searchFeedbackState?.details}
                   variant={selectedCategory ? "warning" : searchFeedbackState?.variant ?? "warning"}
                 />
-                {!selectedCategory && trustedSources.length > 0 && (
-                  <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
-                    <div className="flex items-start gap-3">
-                      <div className="rounded-2xl bg-teal-50 p-3 text-teal-700">
-                        <Globe2 className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-slate-900">
-                          Trusted job websites for {formState.country === "Worldwide" ? "worldwide search" : formState.country}
-                        </h3>
-                        <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-600">
-                          Live provider coverage is still thin for this search. These trusted external job websites are a good next step while we keep expanding worldwide provider coverage.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                      {trustedSources.map((source) => (
-                        <a
-                          key={`${formState.country}-${source.name}`}
-                          href={source.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4 transition hover:-translate-y-0.5 hover:border-teal-200 hover:bg-white hover:shadow-sm"
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <p className="font-semibold text-slate-900">{source.name}</p>
-                            <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 ring-1 ring-slate-200">
-                              {source.category}
-                            </span>
-                          </div>
-                          <p className="mt-3 text-sm leading-6 text-slate-600">{source.note}</p>
-                          <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-teal-700">
-                            Open source
-                            <ExternalLink className="h-4 w-4" />
-                          </div>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             ) : view === "cards" ? (
               <div className="grid gap-4">

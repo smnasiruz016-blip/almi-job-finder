@@ -153,4 +153,10 @@ export type JobSourceLink = {
   url: string;
   category: string;
   note: string;
+  region?: string;
+  sourcePriority?: number;
+  hasApi?: boolean;
+  isAggregator?: boolean;
+  isEmployerBoard?: boolean;
+  isTrusted?: boolean;
 };
