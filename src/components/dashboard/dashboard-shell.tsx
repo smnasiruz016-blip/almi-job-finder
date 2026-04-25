@@ -241,6 +241,7 @@ export function DashboardShell({
   const [view, setView] = useState<"cards" | "table">("cards");
   const [sortBy, setSortBy] = useState<"best-match" | "newest" | "salary">("best-match");
   const [selectedJob, setSelectedJob] = useState<RankedJob | null>(initialResults[0] ?? null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchStatus, setSearchStatus] = useState<SearchStatus>({ type: "idle" });
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>({ type: "idle" });
   const [searchUsage, setSearchUsage] = useState<SearchUsageSnapshot>(usage);
@@ -296,7 +297,6 @@ export function DashboardShell({
     return next.sort((a, b) => b.matchScore - a.matchScore);
   }, [results, sortBy]);
 
-  const resumeSuggestions = useMemo(() => buildResumeSuggestions(resumeSnapshot, selectedJob), [resumeSnapshot, selectedJob]);
   const profileInsights = useMemo(() => buildProfileInsights(resumeSnapshot), [resumeSnapshot]);
   const alertOverview = useMemo(() => buildAlertOverview(savedSearches, alertsEnabledOnPlan), [savedSearches, alertsEnabledOnPlan]);
   const setupChecklist = useMemo(
@@ -371,6 +371,29 @@ export function DashboardShell({
       .sort((left, right) => right.count - left.count || left.category.localeCompare(right.category))
       .slice(0, 6);
   }, [results]);
+  const filteredResults = useMemo(() => {
+    if (!selectedCategory) {
+      return sortedResults;
+    }
+
+    return sortedResults.filter((job) => (getRoleProfile(job.title)?.category ?? "Other") === selectedCategory);
+  }, [selectedCategory, sortedResults]);
+  const visibleSelectedJob = useMemo(() => {
+    if (filteredResults.length === 0) {
+      return null;
+    }
+
+    if (!selectedJob) {
+      return filteredResults[0] ?? null;
+    }
+
+    return (
+      filteredResults.find((job) => `${job.source}-${job.externalJobId}` === `${selectedJob.source}-${selectedJob.externalJobId}`) ??
+      filteredResults[0] ??
+      null
+    );
+  }, [filteredResults, selectedJob]);
+  const resumeSuggestions = useMemo(() => buildResumeSuggestions(resumeSnapshot, visibleSelectedJob), [resumeSnapshot, visibleSelectedJob]);
 
   function updateForm<K extends keyof SearchFormState>(key: K, value: SearchFormState[K]) {
     setFormState((current) => ({ ...current, [key]: value }));
@@ -421,6 +444,7 @@ export function DashboardShell({
       }
       setResults([]);
       setSelectedJob(null);
+      setSelectedCategory(null);
       setSearchMeta(null);
       setSearchStatus({
         type: "error",
@@ -435,6 +459,7 @@ export function DashboardShell({
     }
     setResults(data.results);
     setSelectedJob(data.results[0] ?? null);
+    setSelectedCategory(null);
     setSearchMeta(data.meta ?? null);
     if (data.searchId) {
       setHistory((current) => [
@@ -722,12 +747,21 @@ export function DashboardShell({
             {liveCategoryCounts.length > 0 ? (
               <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {liveCategoryCounts.map((entry) => (
-                  <div key={entry.category} className="rounded-[1.25rem] bg-slate-50 px-4 py-3">
+                  <button
+                    key={entry.category}
+                    type="button"
+                    onClick={() => setSelectedCategory((current) => (current === entry.category ? null : entry.category))}
+                    className={`rounded-[1.25rem] px-4 py-3 text-left transition ${
+                      selectedCategory === entry.category
+                        ? "bg-teal-50 ring-2 ring-teal-200"
+                        : "bg-slate-50 hover:bg-slate-100"
+                    }`}
+                  >
                     <p className="text-sm font-semibold text-slate-900">{entry.category}</p>
                     <p className="mt-2 text-sm text-slate-500">
                       {entry.count} job{entry.count === 1 ? "" : "s"}
                     </p>
-                  </div>
+                  </button>
                 ))}
               </div>
             ) : (
@@ -1234,14 +1268,31 @@ export function DashboardShell({
 
           <div className="mt-5">
             {sortedResults.length > 0 && (
-              <div className="mb-5 grid gap-3 md:grid-cols-4">
+              <div className="mb-5 space-y-3">
+                {selectedCategory ? (
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.25rem] bg-teal-50 px-4 py-3">
+                    <p className="text-sm font-medium text-teal-900">
+                      Filtering this result set by <span className="font-semibold">{selectedCategory}</span>.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCategory(null)}
+                      className="rounded-full bg-white px-3 py-2 text-xs font-semibold text-teal-800 ring-1 ring-teal-200 transition hover:bg-teal-100"
+                    >
+                      Clear filter
+                    </button>
+                  </div>
+                ) : null}
+                <div className="grid gap-3 md:grid-cols-4">
                 <div className="rounded-[1.25rem] bg-white px-4 py-3 ring-1 ring-slate-200">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Jobs found</p>
-                  <p className="mt-2 text-2xl font-semibold text-slate-950">{resultsSummary.totalJobs}</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-950">{filteredResults.length}</p>
                 </div>
                 <div className="rounded-[1.25rem] bg-white px-4 py-3 ring-1 ring-slate-200">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Strong matches</p>
-                  <p className="mt-2 text-2xl font-semibold text-slate-950">{resultsSummary.strongMatches}</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-950">
+                    {filteredResults.filter((job) => job.matchScore >= 80).length}
+                  </p>
                 </div>
                 <div className="rounded-[1.25rem] bg-white px-4 py-3 ring-1 ring-slate-200">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Resume use</p>
@@ -1261,6 +1312,7 @@ export function DashboardShell({
                     {resultsSummary.providerLabel}
                   </p>
                 </div>
+              </div>
               </div>
             )}
 
@@ -1391,16 +1443,20 @@ export function DashboardShell({
             )}
             {searchStatus.type === "loading" ? (
               <ResultSkeleton />
-            ) : sortedResults.length === 0 ? (
+            ) : filteredResults.length === 0 ? (
               <div className="space-y-4">
                 <EmptyState
-                  title={searchFeedbackState?.title ?? "No jobs found yet"}
-                  description={searchFeedbackState?.description ?? "Try broadening your title, removing a strict filter, or searching again in a moment."}
-                  nextStep={searchFeedbackState?.nextStep ?? "Adjust one filter, then search again."}
-                  details={searchFeedbackState?.details}
-                  variant={searchFeedbackState?.variant ?? "warning"}
+                  title={selectedCategory ? `No ${selectedCategory} jobs in this result set` : searchFeedbackState?.title ?? "No jobs found yet"}
+                  description={
+                    selectedCategory
+                      ? `Your current search returned jobs, but none of them are in the ${selectedCategory} category.`
+                      : searchFeedbackState?.description ?? "Try broadening your title, removing a strict filter, or searching again in a moment."
+                  }
+                  nextStep={selectedCategory ? "Clear the category filter or run a broader search." : searchFeedbackState?.nextStep ?? "Adjust one filter, then search again."}
+                  details={selectedCategory ? ["Use Clear filter to return to the full result set.", "Try a broader role title if you want more category coverage."] : searchFeedbackState?.details}
+                  variant={selectedCategory ? "warning" : searchFeedbackState?.variant ?? "warning"}
                 />
-                {trustedSources.length > 0 && (
+                {!selectedCategory && trustedSources.length > 0 && (
                   <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
                     <div className="flex items-start gap-3">
                       <div className="rounded-2xl bg-teal-50 p-3 text-teal-700">
@@ -1443,8 +1499,14 @@ export function DashboardShell({
               </div>
             ) : view === "cards" ? (
               <div className="grid gap-4">
-                {sortedResults.map((job) => (
-                  <JobCard key={`${job.source}-${job.externalJobId}`} job={job} selected={selectedJob?.externalJobId === job.externalJobId} onInspect={setSelectedJob} onSave={saveJob} />
+                {filteredResults.map((job) => (
+                  <JobCard
+                    key={`${job.source}-${job.externalJobId}`}
+                    job={job}
+                    selected={visibleSelectedJob?.externalJobId === job.externalJobId}
+                    onInspect={setSelectedJob}
+                    onSave={saveJob}
+                  />
                 ))}
               </div>
             ) : (
@@ -1460,7 +1522,7 @@ export function DashboardShell({
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedResults.map((job) => (
+                    {filteredResults.map((job) => (
                       <tr key={job.externalJobId} className="border-t border-slate-100">
                         <td className="px-4 py-3">
                           <p className="font-medium text-slate-900">{job.title}</p>
@@ -1614,21 +1676,21 @@ export function DashboardShell({
               </div>
             </div>
 
-            {selectedJob ? (
+            {visibleSelectedJob ? (
               <div className="mt-5 space-y-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-xl font-semibold text-slate-950">{selectedJob.title}</p>
-                    <p className="text-sm text-slate-500">{selectedJob.company}</p>
+                    <p className="text-xl font-semibold text-slate-950">{visibleSelectedJob.title}</p>
+                    <p className="text-sm text-slate-500">{visibleSelectedJob.company}</p>
                   </div>
                   <div className="w-full max-w-[220px]">
-                    <MatchScore score={selectedJob.matchScore} reasons={selectedJob.matchReasons} />
+                    <MatchScore score={visibleSelectedJob.matchScore} reasons={visibleSelectedJob.matchReasons} />
                   </div>
                 </div>
                 <div className="rounded-[1.5rem] bg-white p-5 ring-1 ring-slate-200">
                   <p className="font-semibold text-slate-900">Why this matched</p>
                   <ul className="mt-3 space-y-2 text-sm leading-7 text-slate-600">
-                    {selectedJob.matchReasons.map((reason) => (
+                    {visibleSelectedJob.matchReasons.map((reason) => (
                       <li key={reason}>- {reason}</li>
                     ))}
                   </ul>
