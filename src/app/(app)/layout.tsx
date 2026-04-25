@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BellRing, Search, UserRound } from "lucide-react";
+import { BellRing, Building2, Search, UserRound } from "lucide-react";
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
 import { requireUser } from "@/lib/auth";
 
@@ -35,6 +35,13 @@ export default async function AppLayout({
                 >
                   <BellRing className="h-4 w-4" />
                   Alerts
+                </Link>
+                <Link
+                  href="/employer"
+                  className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50"
+                >
+                  <Building2 className="h-4 w-4" />
+                  Employers
                 </Link>
                 <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-sm text-slate-700">
                   <UserRound className="h-4 w-4" />

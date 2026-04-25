@@ -117,3 +117,33 @@ export type EmployerInventoryOverview = {
   featuredCompanies: HiringCompanyPreview[];
   source: "database" | "fallback" | "unavailable";
 };
+
+export type EmployerVacancyPreview = {
+  id: string;
+  title: string;
+  status: string;
+  country: string;
+  city?: string | null;
+  remoteMode?: string | null;
+  employmentType?: string | null;
+  createdAt: string;
+};
+
+export type EmployerCompanyWorkspace = {
+  id: string;
+  name: string;
+  slug: string;
+  website?: string | null;
+  country: string;
+  city?: string | null;
+  verified: boolean;
+  membershipRole: string;
+  vacancies: EmployerVacancyPreview[];
+};
+
+export type EmployerWorkspace = {
+  ready: boolean;
+  canCreateCompany: boolean;
+  companies: EmployerCompanyWorkspace[];
+  source: "database" | "fallback" | "unavailable";
+};

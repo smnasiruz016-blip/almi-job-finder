@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { BarChart3, BellRing, Bookmark, FileSearch2, Home, Shield, Sparkles } from "lucide-react";
+import { BarChart3, BellRing, Bookmark, Building2, FileSearch2, Home, Shield, Sparkles } from "lucide-react";
 import { canUseAlerts, canUseResumeInsights, hasUnlimitedSearches } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 import type { SessionUser } from "@/types";
@@ -64,6 +64,13 @@ export function SidebarNav({ user, className }: SidebarNavProps) {
             {label}
           </a>
         ))}
+        <Link
+          href="/employer"
+          className="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+        >
+          <Building2 className="h-4 w-4" />
+          Employers
+        </Link>
         {user.role === "ADMIN" && (
           <Link
             href="/admin"

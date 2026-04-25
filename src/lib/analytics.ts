@@ -6,7 +6,9 @@ export type ProductEventName =
   | "job_saved"
   | "search_saved"
   | "alert_toggled"
-  | "plan_limit_hit";
+  | "plan_limit_hit"
+  | "company_created"
+  | "vacancy_posted";
 
 export type ProductEvent = {
   name: ProductEventName;

@@ -1,11 +1,29 @@
-import { prisma } from "@/lib/prisma";
+import { CompanyUserRole, VacancyStatus } from "@prisma/client";
+import { isWorldwideFilter, normalizeLocationFilter } from "@/lib/location";
+import { getPreferredProviderQuery, matchesSearchQuery } from "@/lib/search-query";
+import { trackProductEvent } from "@/lib/analytics";
 import { log } from "@/lib/logger";
-import type { EmployerInventoryOverview, HiringCompanyPreview } from "@/types";
+import { prisma } from "@/lib/prisma";
+import type {
+  EmployerCompanyWorkspace,
+  EmployerInventoryOverview,
+  EmployerWorkspace,
+  HiringCompanyPreview,
+  JobSearchInput,
+  NormalizedJob
+} from "@/types";
 
 const FALLBACK_COMPANY_OVERVIEW: EmployerInventoryOverview = {
   totalHiringCompanies: 0,
   totalOpenVacancies: 0,
   featuredCompanies: [],
+  source: "fallback"
+};
+
+const FALLBACK_WORKSPACE: EmployerWorkspace = {
+  ready: false,
+  canCreateCompany: false,
+  companies: [],
   source: "fallback"
 };
 
@@ -20,6 +38,58 @@ type FeaturedCompanyRow = {
   openRoles: number;
   roleTitles: string[] | null;
 };
+
+function slugify(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-")
+    .slice(0, 60);
+}
+
+type SlugLookupClient = Pick<typeof prisma, "company">;
+
+async function ensureUniqueCompanySlug(baseName: string, tx: SlugLookupClient = prisma) {
+  const baseSlug = slugify(baseName) || "company";
+  let candidate = baseSlug;
+  let suffix = 2;
+
+  while (await tx.company.findUnique({ where: { slug: candidate }, select: { id: true } })) {
+    candidate = `${baseSlug}-${suffix}`;
+    suffix += 1;
+  }
+
+  return candidate;
+}
+
+export async function isEmployerSchemaReady() {
+  try {
+    const [companyTable] = await prisma.$queryRawUnsafe<Array<{ exists: boolean }>>(
+      `SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'Company'
+      ) AS "exists"`
+    );
+    const [vacancyTable] = await prisma.$queryRawUnsafe<Array<{ exists: boolean }>>(
+      `SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'Vacancy'
+      ) AS "exists"`
+    );
+
+    return Boolean(companyTable?.exists && vacancyTable?.exists);
+  } catch (error) {
+    log("warn", "Employer schema readiness check failed", {
+      error: error instanceof Error ? error.message : "Unknown error"
+    });
+    return false;
+  }
+}
 
 function toPreview(row: FeaturedCompanyRow): HiringCompanyPreview {
   return {
@@ -36,22 +106,16 @@ function toPreview(row: FeaturedCompanyRow): HiringCompanyPreview {
 }
 
 export async function getEmployerInventoryOverview(): Promise<EmployerInventoryOverview> {
+  const schemaReady = await isEmployerSchemaReady();
+
+  if (!schemaReady) {
+    return FALLBACK_COMPANY_OVERVIEW;
+  }
+
   try {
-    const [{ exists } = { exists: false }] = await prisma.$queryRawUnsafe<Array<{ exists: boolean }>>(
-      `SELECT EXISTS (
-        SELECT 1
-        FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name = 'Company'
-      ) AS "exists"`
-    );
-
-    if (!exists) {
-      return FALLBACK_COMPANY_OVERVIEW;
-    }
-
     const [countRow] = await prisma.$queryRawUnsafe<Array<{ totalHiringCompanies: number; totalOpenVacancies: number }>>(
       `SELECT
-        COUNT(DISTINCT c.id)::int AS "totalHiringCompanies",
+        COUNT(DISTINCT CASE WHEN v.id IS NOT NULL THEN c.id END)::int AS "totalHiringCompanies",
         COUNT(v.id)::int AS "totalOpenVacancies"
       FROM "Company" c
       LEFT JOIN "Vacancy" v
@@ -95,5 +159,346 @@ export async function getEmployerInventoryOverview(): Promise<EmployerInventoryO
       ...FALLBACK_COMPANY_OVERVIEW,
       source: "unavailable"
     };
+  }
+}
+
+export async function getEmployerWorkspace(userId: string): Promise<EmployerWorkspace> {
+  const schemaReady = await isEmployerSchemaReady();
+
+  if (!schemaReady) {
+    return FALLBACK_WORKSPACE;
+  }
+
+  try {
+    const memberships = await prisma.companyUser.findMany({
+      where: { userId },
+      include: {
+        company: {
+          include: {
+            vacancies: {
+              orderBy: { createdAt: "desc" }
+            }
+          }
+        }
+      },
+      orderBy: {
+        createdAt: "asc"
+      }
+    });
+
+    const companies: EmployerCompanyWorkspace[] = memberships.map((membership) => ({
+      id: membership.company.id,
+      name: membership.company.name,
+      slug: membership.company.slug,
+      website: membership.company.website,
+      country: membership.company.country,
+      city: membership.company.city,
+      verified: membership.company.verified,
+      membershipRole: membership.role,
+      vacancies: membership.company.vacancies.map((vacancy) => ({
+        id: vacancy.id,
+        title: vacancy.title,
+        status: vacancy.status,
+        country: vacancy.country,
+        city: vacancy.city,
+        remoteMode: vacancy.remoteMode,
+        employmentType: vacancy.employmentType,
+        createdAt: vacancy.createdAt.toISOString()
+      }))
+    }));
+
+    return {
+      ready: true,
+      canCreateCompany: companies.length === 0,
+      companies,
+      source: "database"
+    };
+  } catch (error) {
+    log("warn", "Employer workspace fallback activated", {
+      userId,
+      error: error instanceof Error ? error.message : "Unknown error"
+    });
+
+    return {
+      ...FALLBACK_WORKSPACE,
+      source: "unavailable"
+    };
+  }
+}
+
+export async function createCompanyForUser(
+  userId: string,
+  input: {
+    name: string;
+    website?: string | null;
+    country: string;
+    city?: string | null;
+    description?: string | null;
+  }
+): Promise<EmployerCompanyWorkspace> {
+  if (!(await isEmployerSchemaReady())) {
+    throw new Error("EMPLOYER_SCHEMA_NOT_READY");
+  }
+
+  const company = await prisma.$transaction(async (tx) => {
+    const existingMembership = await tx.companyUser.findFirst({
+      where: { userId },
+      select: { id: true }
+    });
+
+    if (existingMembership) {
+      throw new Error("COMPANY_ALREADY_EXISTS");
+    }
+
+    const slug = await ensureUniqueCompanySlug(input.name, tx);
+
+    return tx.company.create({
+      data: {
+        name: input.name,
+        slug,
+        website: input.website || null,
+        country: input.country,
+        city: input.city || null,
+        description: input.description || null,
+        users: {
+          create: {
+            userId,
+            role: CompanyUserRole.OWNER
+          }
+        }
+      },
+      include: {
+        users: {
+          where: { userId }
+        },
+        vacancies: true
+      }
+    });
+  });
+
+  await trackProductEvent({
+    name: "company_created",
+    userId,
+    properties: {
+      companyId: company.id,
+      companyName: company.name,
+      country: company.country
+    }
+  });
+
+  return {
+    id: company.id,
+    name: company.name,
+    slug: company.slug,
+    website: company.website,
+    country: company.country,
+    city: company.city,
+    verified: company.verified,
+    membershipRole: company.users[0]?.role ?? CompanyUserRole.OWNER,
+    vacancies: []
+  };
+}
+
+export async function createVacancyForUser(
+  userId: string,
+  input: {
+    companyId: string;
+    title: string;
+    description: string;
+    country: string;
+    state?: string | null;
+    city?: string | null;
+    remoteMode?: "REMOTE" | "HYBRID" | "ONSITE" | "FLEXIBLE" | null;
+    employmentType?: "FULL_TIME" | "PART_TIME" | "CONTRACT" | "INTERNSHIP" | "TEMPORARY" | null;
+    salaryMin?: number | null;
+    salaryMax?: number | null;
+    applyUrl?: string | null;
+    status?: "DRAFT" | "ACTIVE" | "CLOSED";
+  }
+) {
+  if (!(await isEmployerSchemaReady())) {
+    throw new Error("EMPLOYER_SCHEMA_NOT_READY");
+  }
+
+  const membership = await prisma.companyUser.findFirst({
+    where: {
+      userId,
+      companyId: input.companyId
+    }
+  });
+
+  if (!membership) {
+    throw new Error("COMPANY_ACCESS_DENIED");
+  }
+
+  const vacancy = await prisma.vacancy.create({
+    data: {
+      companyId: input.companyId,
+      title: input.title,
+      description: input.description,
+      country: input.country,
+      state: input.state || null,
+      city: input.city || null,
+      remoteMode: input.remoteMode ?? null,
+      employmentType: input.employmentType ?? null,
+      salaryMin: input.salaryMin ?? null,
+      salaryMax: input.salaryMax ?? null,
+      applyUrl: input.applyUrl || null,
+      status: (input.status as VacancyStatus | undefined) ?? VacancyStatus.DRAFT
+    }
+  });
+
+  await trackProductEvent({
+    name: "vacancy_posted",
+    userId,
+    properties: {
+      vacancyId: vacancy.id,
+      companyId: vacancy.companyId,
+      country: vacancy.country,
+      status: vacancy.status
+    }
+  });
+
+  return vacancy;
+}
+
+function matchesExactOrWorldwide(filterValue?: string | null, targetValue?: string | null) {
+  if (!filterValue || isWorldwideFilter(filterValue)) {
+    return true;
+  }
+
+  const normalizedFilter = normalizeLocationFilter(filterValue);
+  const normalizedTarget = normalizeLocationFilter(targetValue ?? "");
+
+  return Boolean(normalizedFilter && normalizedTarget && normalizedTarget.includes(normalizedFilter));
+}
+
+function matchesVacancyLocation(input: JobSearchInput, vacancy: { country: string; state?: string | null; city?: string | null; remoteMode?: string | null }) {
+  if (!matchesExactOrWorldwide(input.country, vacancy.country)) {
+    return false;
+  }
+
+  if (input.state && !matchesExactOrWorldwide(input.state, vacancy.state)) {
+    return false;
+  }
+
+  if (input.city && !matchesExactOrWorldwide(input.city, vacancy.city)) {
+    return false;
+  }
+
+  if (input.remoteMode && vacancy.remoteMode && input.remoteMode !== vacancy.remoteMode) {
+    return false;
+  }
+
+  return true;
+}
+
+function buildVacancyLocation(vacancy: { city?: string | null; state?: string | null; country: string }) {
+  return [vacancy.city, vacancy.state, vacancy.country].filter(Boolean).join(", ");
+}
+
+function buildVacancyKeywords(vacancy: {
+  title: string;
+  description: string;
+  company: { name: string };
+  country: string;
+  city?: string | null;
+  state?: string | null;
+}) {
+  return [
+    vacancy.title,
+    vacancy.company.name,
+    vacancy.country,
+    vacancy.state ?? "",
+    vacancy.city ?? "",
+    ...vacancy.description
+      .split(/[^a-zA-Z0-9+#/]+/)
+      .map((token) => token.trim())
+      .filter((token) => token.length >= 3)
+      .slice(0, 20)
+  ].filter(Boolean);
+}
+
+export async function searchEmployerVacancies(input: JobSearchInput): Promise<NormalizedJob[]> {
+  if (!(await isEmployerSchemaReady())) {
+    return [];
+  }
+
+  const titleNeedle = getPreferredProviderQuery(input.desiredTitle);
+  const keywordNeedle = getPreferredProviderQuery(input.keyword);
+
+  try {
+    const vacancies = await prisma.vacancy.findMany({
+      where: {
+        status: VacancyStatus.ACTIVE
+      },
+      include: {
+        company: true
+      },
+      orderBy: {
+        createdAt: "desc"
+      },
+      take: 50
+    });
+
+    return vacancies
+      .filter((vacancy) => {
+        if (!matchesVacancyLocation(input, vacancy)) {
+          return false;
+        }
+
+        if (input.employmentType && vacancy.employmentType && input.employmentType !== vacancy.employmentType) {
+          return false;
+        }
+
+        if (input.company && !vacancy.company.name.toLowerCase().includes(input.company.toLowerCase())) {
+          return false;
+        }
+
+        if (input.salaryMin && typeof vacancy.salaryMax === "number" && vacancy.salaryMax < input.salaryMin) {
+          return false;
+        }
+
+        if (input.postedWithinDays) {
+          const maxAgeMs = input.postedWithinDays * 24 * 60 * 60 * 1000;
+          if (Date.now() - vacancy.createdAt.getTime() > maxAgeMs) {
+            return false;
+          }
+        }
+
+        const haystack = `${vacancy.title} ${vacancy.description} ${vacancy.company.name}`.toLowerCase();
+        return matchesSearchQuery(haystack, titleNeedle) && matchesSearchQuery(haystack, keywordNeedle);
+      })
+      .map((vacancy) => ({
+        externalJobId: vacancy.id,
+        source: "Almiworld Employers",
+        sourceType: "live" as const,
+        title: vacancy.title,
+        company: vacancy.company.name,
+        location: buildVacancyLocation(vacancy),
+        salaryMin: vacancy.salaryMin ?? undefined,
+        salaryMax: vacancy.salaryMax ?? undefined,
+        salary:
+          typeof vacancy.salaryMin === "number" || typeof vacancy.salaryMax === "number"
+            ? `$${vacancy.salaryMin ?? "?"} - $${vacancy.salaryMax ?? "?"}`
+            : undefined,
+        jobType: vacancy.employmentType ?? undefined,
+        remoteStatus: vacancy.remoteMode ?? undefined,
+        descriptionSnippet: vacancy.description.replace(/\s+/g, " ").trim().slice(0, 240),
+        applyUrl: vacancy.applyUrl || vacancy.company.website || "https://www.almiworld.com",
+        postedDate: vacancy.createdAt.toISOString(),
+        keywords: buildVacancyKeywords(vacancy),
+        providerMetadata: {
+          attributionLabel: "Source: Almiworld Employers",
+          attributionUrl: vacancy.company.website || "https://www.almiworld.com"
+        }
+      }));
+  } catch (error) {
+    log("warn", "Employer vacancy search fallback activated", {
+      desiredTitle: input.desiredTitle,
+      country: input.country,
+      error: error instanceof Error ? error.message : "Unknown error"
+    });
+    return [];
   }
 }

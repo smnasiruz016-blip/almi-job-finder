@@ -1,18 +1,40 @@
+import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { COUNTRY_OPTIONS } from "@/lib/location-data";
 import { log } from "@/lib/logger";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { getLatestParsedResume } from "@/server/services/resume-service";
 import { getEmployerInventoryOverview } from "@/server/services/company-vacancies";
+import { executeJobSearch } from "@/server/services/job-search";
 import { getSearchUsageForUser } from "@/server/services/usage";
+import type { RankedJob } from "@/types";
+
+async function getDetectedCountry() {
+  const requestHeaders = await headers();
+  const countryCode = requestHeaders.get("x-vercel-ip-country")?.trim().toUpperCase();
+
+  if (!countryCode) {
+    return "Worldwide";
+  }
+
+  try {
+    const displayName = new Intl.DisplayNames(["en"], { type: "region" }).of(countryCode);
+    return displayName && COUNTRY_OPTIONS.includes(displayName) ? displayName : "Worldwide";
+  } catch {
+    return "Worldwide";
+  }
+}
 
 export default async function DashboardPage() {
   const user = await requireUser();
+  const detectedCountry = await getDetectedCountry();
   let resume = null;
   let savedJobs: Awaited<ReturnType<typeof prisma.savedJob.findMany>> = [];
   let savedSearches: Awaited<ReturnType<typeof prisma.savedSearch.findMany>> = [];
   let history: Awaited<ReturnType<typeof prisma.jobSearch.findMany>> = [];
   let employerInventory = await getEmployerInventoryOverview();
+  let initialResults: RankedJob[] = [];
   const usage = await getSearchUsageForUser(user.id);
 
   try {
@@ -35,6 +57,35 @@ export default async function DashboardPage() {
       }),
       getEmployerInventoryOverview()
     ]);
+
+    try {
+      const seededTitle = history[0]?.desiredTitle || resume?.preferredRoles?.[0] || "";
+      let initialSearch = await executeJobSearch(
+        {
+          desiredTitle: seededTitle,
+          country: detectedCountry
+        },
+        resume
+      );
+
+      if (initialSearch.results.length === 0 && detectedCountry !== "Worldwide") {
+        initialSearch = await executeJobSearch(
+          {
+            desiredTitle: seededTitle,
+            country: "Worldwide"
+          },
+          resume
+        );
+      }
+
+      initialResults = initialSearch.results.slice(0, 12);
+    } catch (error) {
+      log("warn", "Dashboard initial job preload failed", {
+        userId: user.id,
+        country: detectedCountry,
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
   } catch (error) {
     log("error", "Dashboard data fallback activated", {
       userId: user.id,
@@ -48,6 +99,7 @@ export default async function DashboardPage() {
       resume={resume}
       usage={usage}
       employerInventory={employerInventory}
+      initialResults={initialResults}
       initialSavedJobs={savedJobs}
       initialSavedSearches={savedSearches.map((search) => ({
         id: search.id,

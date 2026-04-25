@@ -2,6 +2,7 @@ import { log } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { getSuggestedQueryReplacement } from "@/lib/search-query";
 import { fetchFromAdapters } from "@/server/adapters/provider-registry";
+import { searchEmployerVacancies } from "@/server/services/company-vacancies";
 import { rankJobs } from "@/server/services/ranking";
 import type { JobSearchInput, NormalizedJob, ParsedResume, SearchInsights } from "@/types";
 
@@ -147,7 +148,17 @@ export async function executeJobSearch(input: JobSearchInput, resume?: ParsedRes
   };
 
   const { jobs, usedFallback, sources, providerStatuses } = await fetchFromAdapters(normalizedInput);
-  const results = dedupeJobs(jobs);
+  const employerJobs = await searchEmployerVacancies(normalizedInput);
+  const employerStatus = {
+    source: "Almiworld Employers",
+    sourceType: "live" as const,
+    status: employerJobs.length ? ("success" as const) : ("no_matches" as const),
+    results: employerJobs.length,
+    message: employerJobs.length
+      ? "Direct employer vacancies matched this search."
+      : "No direct employer vacancies matched this search yet."
+  };
+  const results = dedupeJobs([...jobs, ...employerJobs]);
   const ranked = rankJobs(results, normalizedInput, resume);
   const insights = buildSearchInsights(ranked, normalizedInput);
   const quality = {
@@ -165,11 +176,11 @@ export async function executeJobSearch(input: JobSearchInput, resume?: ParsedRes
     results: ranked,
     meta: {
       usedFallback,
-      sources,
+      sources: [...new Set([...sources, ...employerJobs.map((job) => job.source)])],
       sourceBreakdown,
       insights,
       quality,
-      providerStatuses
+      providerStatuses: [...providerStatuses, employerStatus]
     }
   };
 }

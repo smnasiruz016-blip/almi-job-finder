@@ -42,6 +42,7 @@ type DashboardShellProps = {
   resume: ParsedResume | null;
   usage: SearchUsageSnapshot;
   employerInventory: EmployerInventoryOverview;
+  initialResults: RankedJob[];
   initialSavedJobs: Array<{
     id: string;
     title: string;
@@ -226,19 +227,20 @@ export function DashboardShell({
   resume,
   usage,
   employerInventory,
+  initialResults,
   initialSavedJobs,
   initialSavedSearches,
   initialHistory
 }: DashboardShellProps) {
   const [resumeSnapshot, setResumeSnapshot] = useState(resume);
-  const [results, setResults] = useState<RankedJob[]>([]);
+  const [results, setResults] = useState<RankedJob[]>(initialResults);
   const [savedJobs, setSavedJobs] = useState(initialSavedJobs);
   const [savedSearches, setSavedSearches] = useState(initialSavedSearches);
   const [history, setHistory] = useState(initialHistory);
   const [lastSearchPayload, setLastSearchPayload] = useState<Record<string, FormDataEntryValue>>({});
   const [view, setView] = useState<"cards" | "table">("cards");
   const [sortBy, setSortBy] = useState<"best-match" | "newest" | "salary">("best-match");
-  const [selectedJob, setSelectedJob] = useState<RankedJob | null>(null);
+  const [selectedJob, setSelectedJob] = useState<RankedJob | null>(initialResults[0] ?? null);
   const [searchStatus, setSearchStatus] = useState<SearchStatus>({ type: "idle" });
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>({ type: "idle" });
   const [searchUsage, setSearchUsage] = useState<SearchUsageSnapshot>(usage);
@@ -356,6 +358,19 @@ export function DashboardShell({
 
     return getTrustedSourcesForCountry(formState.country);
   }, [formState.country, sortedResults.length]);
+  const liveCategoryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    for (const job of results) {
+      const category = getRoleProfile(job.title)?.category ?? "Other";
+      counts.set(category, (counts.get(category) ?? 0) + 1);
+    }
+
+    return Array.from(counts.entries())
+      .map(([category, count]) => ({ category, count }))
+      .sort((left, right) => right.count - left.count || left.category.localeCompare(right.category))
+      .slice(0, 6);
+  }, [results]);
 
   function updateForm<K extends keyof SearchFormState>(key: K, value: SearchFormState[K]) {
     setFormState((current) => ({ ...current, [key]: value }));
@@ -689,6 +704,37 @@ export function DashboardShell({
                 {results.length ? `${resultsSummary.strongMatches} strong match${resultsSummary.strongMatches === 1 ? "" : "es"} surfaced.` : "Run a search to populate ranked results."}
               </p>
             </div>
+          </div>
+
+          <div className="mt-4 rounded-[1.5rem] bg-white p-5 ring-1 ring-slate-200">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Available jobs by category</p>
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+                  These counts come from your current live result set, not fixed examples.
+                </p>
+              </div>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                {results.length} total
+              </span>
+            </div>
+
+            {liveCategoryCounts.length > 0 ? (
+              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {liveCategoryCounts.map((entry) => (
+                  <div key={entry.category} className="rounded-[1.25rem] bg-slate-50 px-4 py-3">
+                    <p className="text-sm font-semibold text-slate-900">{entry.category}</p>
+                    <p className="mt-2 text-sm text-slate-500">
+                      {entry.count} job{entry.count === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-4 rounded-[1.25rem] bg-slate-50 px-4 py-4 text-sm leading-7 text-slate-600">
+                Run a search to see real category counts such as Finance, Hospitality, Healthcare, and Technology.
+              </div>
+            )}
           </div>
 
           <div className="mt-6 grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">

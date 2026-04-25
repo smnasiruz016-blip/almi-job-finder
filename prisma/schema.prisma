@@ -80,10 +80,10 @@ model Session {
 model Resume {
   id                String   @id @default(cuid())
   userId            String
-  originalFilename  String
-  storagePath       String
-  mimeType          String
-  extractedText     String   @db.Text
+  originalFilename  String?
+  storagePath       String?
+  mimeType          String?
+  extractedText     String?  @db.Text
   parsedName        String?
   parsedEmail       String?
   parsedPhone       String?
@@ -188,7 +188,7 @@ model Company {
 model CompanyUser {
   id        String          @id @default(cuid())
   companyId String
-  userId    String
+  userId    String          @unique
   role      CompanyUserRole @default(RECRUITER)
   company   Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
