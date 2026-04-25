@@ -215,7 +215,7 @@ export function EmployerShell({ workspace }: EmployerShellProps) {
               </div>
               <div>
                 <p className="font-semibold text-slate-900">Post a vacancy</p>
-                <p className="text-sm text-slate-500">Create a direct employer role that can become part of Almiworld&apos;s owned inventory.</p>
+                <p className="text-sm text-slate-500">Create a direct employer role that can become part of Almiworld&apos;s owned inventory. Active vacancies appear in search, while drafts stay private.</p>
               </div>
             </div>
 
@@ -223,7 +223,7 @@ export function EmployerShell({ workspace }: EmployerShellProps) {
 
             <div className="mt-5 grid gap-4 md:grid-cols-2">
               <Input name="title" placeholder="Job title" required />
-              <Select name="status" defaultValue="DRAFT">
+              <Select name="status" defaultValue="ACTIVE">
                 <option value="DRAFT">Draft</option>
                 <option value="ACTIVE">Active</option>
                 <option value="CLOSED">Closed</option>
@@ -263,8 +263,12 @@ export function EmployerShell({ workspace }: EmployerShellProps) {
               </div>
             ) : null}
 
+            <div className="mt-4 rounded-[1.25rem] bg-teal-50 px-4 py-3 text-sm text-teal-900">
+              New vacancies default to <span className="font-semibold">Active</span> so they can appear in search right away.
+            </div>
+
             <Button type="submit" className="mt-5">
-              Save vacancy
+              Post vacancy
             </Button>
           </form>
 
@@ -301,6 +305,15 @@ export function EmployerShell({ workspace }: EmployerShellProps) {
                         </span>
                       ) : null}
                     </div>
+                    {vacancy.status !== "ACTIVE" ? (
+                      <p className="mt-3 text-xs leading-6 text-amber-700">
+                        This vacancy is not live in search yet. Switch it to Active when edit controls are added, or repost it as Active now.
+                      </p>
+                    ) : (
+                      <p className="mt-3 text-xs leading-6 text-emerald-700">
+                        This vacancy is live and eligible to appear in Almiworld search results.
+                      </p>
+                    )}
                   </div>
                 ))
               ) : (
