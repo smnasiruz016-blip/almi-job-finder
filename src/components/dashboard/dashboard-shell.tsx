@@ -23,7 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrencyRange } from "@/lib/utils";
-import type { CountryHiringHighlights, EmployerInventoryOverview, JobSourceLink, ParsedResume, ProviderStatus, RankedJob, SearchInsights, SearchUsageSnapshot, SessionUser } from "@/types";
+import type { CountryBrowseJob, CountryHiringHighlights, EmployerInventoryOverview, JobSourceLink, ParsedResume, ProviderStatus, RankedJob, SearchInsights, SearchUsageSnapshot, SessionUser } from "@/types";
 
 type HistorySnapshot = {
   desiredTitle: string;
@@ -47,6 +47,7 @@ type DashboardShellProps = {
   employerInventory: EmployerInventoryOverview;
   countryHighlights: CountryHiringHighlights;
   trustedCountrySources: JobSourceLink[];
+  countrySampleJobs: CountryBrowseJob[];
   initialResults: RankedJob[];
   initialSavedJobs: Array<{
     id: string;
@@ -253,6 +254,7 @@ export function DashboardShell({
   employerInventory,
   countryHighlights,
   trustedCountrySources,
+  countrySampleJobs,
   initialResults,
   initialSavedJobs,
   initialSavedSearches,
@@ -980,6 +982,7 @@ export function DashboardShell({
             description="This gives visitors and signed-in users a cleaner country entry point before they narrow into a specific role search."
             highlights={countryHighlights}
             trustedSources={trustedCountrySources}
+            sampleJobs={countrySampleJobs}
             compact
           />
 

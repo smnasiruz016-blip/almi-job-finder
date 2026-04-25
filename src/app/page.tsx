@@ -5,6 +5,7 @@ import { CountryHiringPanel } from "@/components/dashboard/country-hiring-panel"
 import { getCurrentUser } from "@/lib/auth";
 import { getCountryHiringHighlights } from "@/server/services/company-vacancies";
 import { getDetectedCountry } from "@/server/services/country-detection";
+import { executeJobSearch } from "@/server/services/job-search";
 import { getTrustedSourcesForCountry } from "@/server/services/source-directory";
 
 const steps = [
@@ -51,10 +52,14 @@ const productSignals = [
 export default async function HomePage() {
   const user = await getCurrentUser();
   const detectedCountry = await getDetectedCountry();
-  const [countryHighlights, trustedCountrySources] = await Promise.all([
+  const [countryHighlights, trustedCountrySources, countrySampleSearch] = await Promise.all([
     getCountryHiringHighlights(detectedCountry),
-    getTrustedSourcesForCountry(detectedCountry)
+    getTrustedSourcesForCountry(detectedCountry),
+    executeJobSearch({ desiredTitle: "", country: detectedCountry })
   ]);
+  const sampleJobs = countrySampleSearch.results
+    .filter((job) => job.sourceType === "live" && job.source !== "Almiworld Employers")
+    .slice(0, 4);
   const primaryHref = user ? "/dashboard" : "/signup";
   const uploadHref = user ? "/dashboard#search" : "/signup";
 
@@ -209,6 +214,7 @@ export default async function HomePage() {
           description="Visitors should be able to see local hiring signals even before they upload a resume or run a narrow search."
           highlights={countryHighlights}
           trustedSources={trustedCountrySources}
+          sampleJobs={sampleJobs}
         />
       </section>
 

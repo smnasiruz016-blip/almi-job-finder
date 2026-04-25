@@ -74,6 +74,11 @@ export type RankedJob = NormalizedJob & {
   missingKeywords: string[];
 };
 
+export type CountryBrowseJob = Pick<
+  RankedJob,
+  "externalJobId" | "source" | "sourceType" | "title" | "company" | "location" | "applyUrl" | "postedDate" | "remoteStatus" | "jobType"
+>;
+
 export type SearchUsageSnapshot = {
   dailyUsed: number;
   dailyLimit: number | null;

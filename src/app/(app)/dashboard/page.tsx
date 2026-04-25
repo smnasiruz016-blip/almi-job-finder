@@ -20,6 +20,7 @@ export default async function DashboardPage() {
   let employerInventory = await getEmployerInventoryOverview();
   let countryHighlights = await getCountryHiringHighlights(detectedCountry);
   let trustedCountrySources = await getTrustedSourcesForCountry(detectedCountry);
+  let countrySampleJobs: RankedJob[] = [];
   let initialResults: RankedJob[] = [];
   const usage = await getSearchUsageForUser(user.id);
 
@@ -48,25 +49,32 @@ export default async function DashboardPage() {
 
     try {
       const seededTitle = history[0]?.desiredTitle || resume?.preferredRoles?.[0] || "";
-      let initialSearch = await executeJobSearch(
-        {
-          desiredTitle: seededTitle,
-          country: detectedCountry
-        },
-        resume
-      );
-
-      if (initialSearch.results.length === 0 && detectedCountry !== "Worldwide") {
-        initialSearch = await executeJobSearch(
+      if (seededTitle) {
+        const initialSearch = await executeJobSearch(
           {
             desiredTitle: seededTitle,
-            country: "Worldwide"
+            country: detectedCountry
           },
           resume
         );
+        initialResults = initialSearch.results.slice(0, 12);
       }
 
-      initialResults = initialSearch.results.slice(0, 12);
+      const countrySampleSearch = await executeJobSearch(
+        {
+          desiredTitle: "",
+          country: detectedCountry
+        },
+        null
+      );
+
+      countrySampleJobs = countrySampleSearch.results
+        .filter((job) => job.sourceType === "live" && job.source !== "Almiworld Employers")
+        .slice(0, 4);
+
+      if (initialResults.length === 0) {
+        initialResults = countrySampleJobs.slice(0, 12);
+      }
     } catch (error) {
       log("warn", "Dashboard initial job preload failed", {
         userId: user.id,
@@ -90,6 +98,7 @@ export default async function DashboardPage() {
       employerInventory={employerInventory}
       countryHighlights={countryHighlights}
       trustedCountrySources={trustedCountrySources}
+      countrySampleJobs={countrySampleJobs}
       initialResults={initialResults}
       initialSavedJobs={savedJobs}
       initialSavedSearches={savedSearches.map((search) => ({
