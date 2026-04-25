@@ -147,3 +147,10 @@ export type EmployerWorkspace = {
   companies: EmployerCompanyWorkspace[];
   source: "database" | "fallback" | "unavailable";
 };
+
+export type JobSourceLink = {
+  name: string;
+  url: string;
+  category: string;
+  note: string;
+};

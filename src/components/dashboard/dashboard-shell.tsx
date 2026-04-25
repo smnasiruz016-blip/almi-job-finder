@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Activity, BellRing, Bookmark, BriefcaseBusiness, Building2, ExternalLink, Globe2, Search, Sparkles, Star, UploadCloud } from "lucide-react";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { JobCard } from "@/components/dashboard/job-card";
@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrencyRange } from "@/lib/utils";
-import type { EmployerInventoryOverview, ParsedResume, ProviderStatus, RankedJob, SearchInsights, SearchUsageSnapshot, SessionUser } from "@/types";
+import type { EmployerInventoryOverview, JobSourceLink, ParsedResume, ProviderStatus, RankedJob, SearchInsights, SearchUsageSnapshot, SessionUser } from "@/types";
 
 type HistorySnapshot = {
   desiredTitle: string;
@@ -247,6 +247,7 @@ export function DashboardShell({
   const [searchUsage, setSearchUsage] = useState<SearchUsageSnapshot>(usage);
   const [saveSearchStatus, setSaveSearchStatus] = useState<InlineStatus>({ type: "idle" });
   const [searchMeta, setSearchMeta] = useState<SearchMeta | null>(null);
+  const [trustedSources, setTrustedSources] = useState<JobSourceLink[]>([]);
   const [formState, setFormState] = useState<SearchFormState>({
     desiredTitle: "",
     keyword: "",
@@ -352,13 +353,6 @@ export function DashboardShell({
   const roleSuggestions = useMemo(() => getRoleSuggestions(formState.desiredTitle), [formState.desiredTitle]);
   const advertisedSkills = useMemo(() => collectAdvertisedSkills(results), [results]);
   const suggestedSkills = useMemo(() => getSuggestedSkillOptions(formState.desiredTitle, results), [formState.desiredTitle, results]);
-  const trustedSources = useMemo(() => {
-    if (sortedResults.length > 0) {
-      return [];
-    }
-
-    return getTrustedSourcesForCountry(formState.country);
-  }, [formState.country, sortedResults.length]);
   const liveCategoryCounts = useMemo(() => {
     const counts = new Map<string, number>();
 
@@ -395,6 +389,39 @@ export function DashboardShell({
     );
   }, [filteredResults, selectedJob]);
   const resumeSuggestions = useMemo(() => buildResumeSuggestions(resumeSnapshot, visibleSelectedJob), [resumeSnapshot, visibleSelectedJob]);
+
+  useEffect(() => {
+    if (sortedResults.length > 0) {
+      return;
+    }
+
+    let cancelled = false;
+    const fallbackSources = getTrustedSourcesForCountry(formState.country);
+
+    async function loadTrustedSources() {
+      try {
+        const response = await fetch(`/api/source-directory?country=${encodeURIComponent(formState.country)}`);
+        if (!response.ok) {
+          throw new Error("SOURCE_DIRECTORY_REQUEST_FAILED");
+        }
+
+        const data = (await response.json()) as { sources?: JobSourceLink[] };
+        if (!cancelled) {
+          setTrustedSources(data.sources?.length ? data.sources : fallbackSources);
+        }
+      } catch {
+        if (!cancelled) {
+          setTrustedSources(fallbackSources);
+        }
+      }
+    }
+
+    void loadTrustedSources();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [formState.country, sortedResults.length]);
 
   function updateForm<K extends keyof SearchFormState>(key: K, value: SearchFormState[K]) {
     setFormState((current) => ({ ...current, [key]: value }));

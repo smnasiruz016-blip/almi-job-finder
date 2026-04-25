@@ -215,3 +215,24 @@ model Vacancy {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 }
+
+model JobSourceDirectory {
+  id              String   @id @default(cuid())
+  region          String
+  country         String
+  website         String
+  url             String
+  category        String
+  notes           String?  @db.Text
+  sourcePriority  Int      @default(100)
+  hasApi          Boolean  @default(false)
+  isAggregator    Boolean  @default(false)
+  isEmployerBoard Boolean  @default(false)
+  isTrusted       Boolean  @default(true)
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([country, website])
+  @@index([country, active, sourcePriority])
+}

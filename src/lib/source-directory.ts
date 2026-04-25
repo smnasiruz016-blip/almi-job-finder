@@ -1,9 +1,4 @@
-export type JobSourceLink = {
-  name: string;
-  url: string;
-  category: "aggregator" | "professional" | "local";
-  note: string;
-};
+import type { JobSourceLink } from "@/types";
 
 const GLOBAL_SOURCES: JobSourceLink[] = [
   {
