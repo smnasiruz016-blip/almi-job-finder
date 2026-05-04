@@ -1,14 +1,13 @@
-import fs from "node:fs/promises";
 import mammoth from "mammoth";
 import pdfParse from "pdf-parse";
 
 /**
- * Extracts plain text from an uploaded resume file (PDF or DOCX).
+ * Extracts plain text from a resume file (PDF or DOCX) given as raw bytes.
+ *
+ * Pure in-memory: never touches disk. Works on serverless (Vercel/Lambda).
  * International-friendly: preserves Unicode characters.
  */
-export async function extractResumeText(filePath: string, mimeType: string): Promise<string> {
-  const bytes = await fs.readFile(filePath);
-
+export async function extractResumeText(bytes: Buffer, mimeType: string): Promise<string> {
   if (bytes.length === 0) {
     throw new Error("EMPTY_FILE: The uploaded file is empty.");
   }
