@@ -4,13 +4,7 @@ import pdfParse from "pdf-parse";
 
 /**
  * Extracts plain text from an uploaded resume file (PDF or DOCX).
- *
- * International-friendly: preserves Unicode characters (Icelandic ð/þ/æ,
- * Arabic, Chinese, accented Latin, etc.) and tries multiple fallbacks
- * before declaring a file unreadable.
- *
- * Throws specific error messages so the API layer can give the user
- * actionable feedback instead of a generic "could not read" message.
+ * International-friendly: preserves Unicode characters.
  */
 export async function extractResumeText(filePath: string, mimeType: string): Promise<string> {
   const bytes = await fs.readFile(filePath);
@@ -43,11 +37,9 @@ async function extractPdfText(bytes: Buffer): Promise<string> {
   const cleaned = cleanExtractedText(result.text ?? "");
 
   if (cleaned.length < 20) {
-    // Text layer is missing or empty - this is almost certainly a scanned/image-based PDF
     throw new Error(
       "PDF_NO_TEXT_LAYER: This PDF appears to be a scanned image with no selectable text. " +
-        "Please re-export your resume as a text-based PDF (from Word, Google Docs, or your CV builder) " +
-        "or upload a DOCX file instead."
+        "Please re-export your resume as a text-based PDF or upload a DOCX file instead."
     );
   }
 
@@ -69,5 +61,30 @@ async function extractDocxText(bytes: Buffer): Promise<string> {
   if (cleaned.length < 20) {
     throw new Error(
       "DOCX_EMPTY: We could not find any text in this DOCX file. " +
-        "Please make sure your resume contains text (not just images) and try again."
+        "Please make sure your resume contains text and try again."
     );
+  }
+
+  return cleaned;
+}
+
+function cleanExtractedText(raw: string): string {
+  let out = "";
+  for (let i = 0; i < raw.length; i++) {
+    const code = raw.charCodeAt(i);
+    if (code === 9 || code === 10) {
+      out += raw[i];
+    } else if (code < 32 || code === 127) {
+      continue;
+    } else {
+      out += raw[i];
+    }
+  }
+
+  return out
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]+/g, " ")
+    .trim();
+}
