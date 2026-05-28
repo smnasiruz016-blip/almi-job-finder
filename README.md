@@ -1,3 +1,12 @@
+# ⚠️ SUPERSEDED
+
+This repository is **no longer maintained**. See the canonical replacement:
+
+→ **https://github.com/smnasiruz016-blip/almijob-v2**
+
+Kept public as historical reference. Do not deploy, extend, or open PRs here.
+
+---
 # AlmiJob Finder
 
 AlmiJob Finder is a beta-ready job search web app built for `almiworld` with Next.js, TypeScript, Tailwind, Prisma, and PostgreSQL. Users can create an account, upload a resume, search live job sources through adapters, search worldwide or by country/state/city, rank jobs by resume fit, save jobs and searches, review resume suggestions, and use a stub-backed alert workflow while real delivery infrastructure is still being finalized.
